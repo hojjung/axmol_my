@@ -89,8 +89,9 @@ Device-Release/
 *.swp
 *.swo
 
-# Ignore files created by create_project.py
-projects/
+# Ignore ad-hoc generated projects, but keep the product project in this tree.
+/projects/*
+!/projects/CapsuleMonsterChess/
 
 # Ignore config files in javascript bindings generator
 tools/tojs/user.cfg
@@ -112,6 +113,7 @@ CMakeSettings.json
 # ignore all build
 /build
 /build_*
+/build-axasset/
 
 # ignore ninja build dir
 /out

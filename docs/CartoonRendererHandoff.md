@@ -41,7 +41,7 @@ engine whose primary visual identity is a stylized character renderer.
 
 The visual references were:
 
-- the JMO toon shader used by the local Unity Unit01 character;
+- the JMO toon shader used by the local Unity Unit02 Dragon Fire character;
 - the AC/Animal Crossing-style shader in the same Unity project;
 - Animal Crossing on Nintendo Switch for readable, soft character rendering;
 - Brawl Stars for large color masses and clear silhouettes;
@@ -66,8 +66,8 @@ asset/runtime foundation only.
 The local Unity reference locations are external to this repository:
 
 ```text
-/Users/ethanjung/dev/CapsuleMonsterChess-main/
-/Users/ethanjung/dev/CapsuleMonsterChess-main/CMS_Unity/Assets/Models/Unit01/
+/Users/ethanjung/Desktop/Dev/Unity/CapsuleMonsterChess/CMS_Unity/
+/Users/ethanjung/Desktop/Dev/Unity/CapsuleMonsterChess/CMS_Unity/Assets/Models/Unit02/DragonFire/
 ```
 
 Those FBX, PSD, converted GLB files, and JMO/AC shader sources are licensed
@@ -79,9 +79,10 @@ reference material. They must never be committed here or used as CI fixtures.
 
 The reference look was separated into two independent, reproducible rules:
 
-1. JMO contribution: Half-Lambert lighting, a soft two-band transition, a
-   bright shadow tint, and warm diffuse color.
-2. AC contribution: a light-facing Fresnel rim that is multiplied by the main
+1. JMO contribution: Half-Lambert lighting, an optional 1D ramp LUT, a soft
+   two-band transition, a bright shadow tint, and warm diffuse color.
+2. AC contribution: shadow-side subsurface fill, a minimum/unlit color floor,
+   and a shaped light-facing Fresnel rim that is multiplied by the main
    directional shadow visibility.
 
 The resulting rim expression is:
@@ -296,6 +297,28 @@ Local-only evidence from the verified run was written to:
 
 The GLB, FBX, PSD, and screenshots are licensed/local evidence and are excluded
 from the repository.
+
+### 3.8 CapsuleMonsterChess project uses the real Unit02 material profile
+
+The standalone `projects/CapsuleMonsterChess` scene maps the Unity Dragon Fire
+material instead of relying on renderer defaults. The source material is
+`Models/Unit02/DragonFire/Materials/Dragon Fire_Mat.mat`, whose generated JMO
+shader is `Toony Colors Pro 2/User/CapsuleMonster_Builtin`. The runtime profile
+uses its 0.7 ramp threshold, 0.5 smoothing, 0.25 shadow color, warm diffuse
+tint, and combines them with the AC shader's shaped light-facing rim,
+subsurface fill, and minimum/unlit color floor. A generated 32x1 linear ramp
+texture keeps the lookup at 128 bytes and contains no licensed pixels.
+
+The AC material's original rim power of 6.56 was visually too narrow after the
+renderer rim remap. The project presentation therefore uses power 2.2, rim end
+0.82, and intensity 0.75. This widens the visible rim while retaining the
+signed main-light-facing and directional-shadow gates.
+
+The 2026-07-14 local Release run used Emscripten 6.0.1, WebGL 2.0, GLSL ES
+3.00, four pthread workers, COOP/COEP isolation, and loaded one mesh, 56 joints,
+and the 1.0-second Fly Idle animation without browser warnings or errors. The
+HTML, JS, data, and WASM payloads total 2,947,487 raw bytes or 1,074,101 bytes
+with Brotli q11, including the ignored 266,116-byte local Dragon GLB.
 
 ## 4. Main implementation map
 

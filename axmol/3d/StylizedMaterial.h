@@ -47,19 +47,29 @@ class Texture;
 /** Linear-space parameters for the mobile stylized material. */
 struct AX_DLL StylizedMaterialDesc
 {
-    Texture2D* baseTexture = nullptr;
-    Color baseColor        = Color::white;
-    Color highlightColor   = Color::white;
-    Color shadowColor      = Color{0.25F, 0.25F, 0.25F, 1.0F};
-    Color diffuseTint      = Color{1.0F, 0.9290111F, 0.75F, 1.0F};
-    Color rimColor         = Color{0.7028302F, 0.98113203F, 1.0F, 1.0F};
-    float bandThreshold    = 0.7F;
-    float bandSoftness     = 0.25F;
-    float rimStart         = 0.7F;
-    float rimEnd           = 1.0F;
-    float rimIntensity     = 1.0F;
-    float alphaCutoff      = 0.0F;
-    bool doubleSided       = false;
+    Texture2D* baseTexture     = nullptr;
+    Texture2D* toonRampTexture = nullptr;
+    Color baseColor            = Color::white;
+    Color highlightColor       = Color::white;
+    Color shadowColor          = Color{0.25F, 0.25F, 0.25F, 1.0F};
+    Color diffuseTint          = Color{1.0F, 0.9290111F, 0.75F, 1.0F};
+    Color rimColor             = Color{0.7028302F, 0.98113203F, 1.0F, 1.0F};
+    Color subsurfaceColor      = Color{1.0F, 0.45F, 0.38F, 1.0F};
+    float bandThreshold        = 0.7F;
+    float bandSoftness         = 0.25F;
+    float rampTextureStrength  = 0.0F;
+    float minimumBrightness    = 0.0F;
+    float unlitStrength        = 0.0F;
+    float subsurfaceStrength   = 0.0F;
+    float subsurfaceFalloff    = 2.0F;
+    float rimStart             = 0.7F;
+    float rimEnd               = 1.0F;
+    float rimPower             = 1.0F;
+    float rimLightThreshold    = 0.05F;
+    float rimLightSoftness     = 0.1F;
+    float rimIntensity         = 1.0F;
+    float alphaCutoff          = 0.0F;
+    bool doubleSided           = false;
     /** glTF/KTX2 upper-left texture-coordinate convention. */
     Vec2 uvOffset{0.0F, 0.0F};
     Vec2 uvScale{1.0F, 1.0F};
@@ -70,8 +80,9 @@ struct AX_DLL StylizedMaterialDesc
 };
 
 /**
- * Mesh material implementing a Half-Lambert two-band response, shadow-aware
- * light-facing rim, and at most two unshadowed point-light contributions.
+ * Mesh material implementing a JMO-style ramp response, optional 1D toon LUT,
+ * AC-style subsurface fill, shadow-aware directional rim, and at most two
+ * unshadowed point-light contributions.
  */
 class AX_DLL StylizedMaterial final : public MeshMaterial
 {
@@ -120,11 +131,14 @@ public:
 
     /** CPU reference for shadow-aware rim validation and tooling. */
     [[nodiscard]] static float evaluateRimMask(float fresnel,
-                                               float lightFacing,
+                                               float signedLightFacing,
                                                float shadowVisibility,
                                                float mainLightLuminance,
                                                float rimStart,
                                                float rimEnd,
+                                               float rimPower,
+                                               float rimLightThreshold,
+                                               float rimLightSoftness,
                                                float intensity) noexcept;
 
 private:

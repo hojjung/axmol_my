@@ -56,12 +56,18 @@ Vec4 toVec4(const Color& color)
 bool StylizedMaterialDesc::isValid() const noexcept
 {
     const auto finite = [](float value) { return std::isfinite(value); };
-    return finite(bandThreshold) && finite(bandSoftness) && finite(rimStart) && finite(rimEnd) &&
+    return finite(bandThreshold) && finite(bandSoftness) && finite(rampTextureStrength) && finite(minimumBrightness) &&
+           finite(unlitStrength) && finite(subsurfaceStrength) && finite(subsurfaceFalloff) && finite(rimStart) &&
+           finite(rimEnd) && finite(rimPower) && finite(rimLightThreshold) && finite(rimLightSoftness) &&
            finite(rimIntensity) && finite(alphaCutoff) && finite(uvOffset.x) && finite(uvOffset.y) &&
            finite(uvScale.x) && finite(uvScale.y) && finite(uvRotation) && bandThreshold >= 0.0F &&
-           bandThreshold <= 1.0F && bandSoftness >= 0.0F && bandSoftness <= 0.5F && rimStart >= 0.0F &&
-           rimStart < rimEnd && rimEnd <= 1.0F && rimEnd - rimStart >= kMinimumRimRange && rimIntensity >= 0.0F &&
-           alphaCutoff >= 0.0F && alphaCutoff <= 1.0F;
+           bandThreshold <= 1.0F && bandSoftness >= 0.0F && bandSoftness <= 0.5F && rampTextureStrength >= 0.0F &&
+           rampTextureStrength <= 1.0F && minimumBrightness >= 0.0F && minimumBrightness <= 1.0F &&
+           unlitStrength >= 0.0F && unlitStrength <= 1.0F && subsurfaceStrength >= 0.0F && subsurfaceStrength <= 1.0F &&
+           subsurfaceFalloff >= 0.1F && subsurfaceFalloff <= 16.0F && rimStart >= 0.0F && rimStart < rimEnd &&
+           rimEnd <= 1.0F && rimEnd - rimStart >= kMinimumRimRange && rimPower >= 0.1F && rimPower <= 16.0F &&
+           rimLightThreshold >= -1.0F && rimLightThreshold <= 1.0F && rimLightSoftness >= 0.0F &&
+           rimLightSoftness <= 1.0F && rimIntensity >= 0.0F && alphaCutoff >= 0.0F && alphaCutoff <= 1.0F;
 }
 
 StylizedMaterial* StylizedMaterial::create(const StylizedMaterialDesc& desc, bool skinned)
@@ -82,6 +88,7 @@ StylizedMaterial::~StylizedMaterial()
     if (_rendererRecreatedListener)
         Director::getInstance()->getEventDispatcher()->removeEventListener(_rendererRecreatedListener);
     AX_SAFE_RELEASE(_desc.baseTexture);
+    AX_SAFE_RELEASE(_desc.toonRampTexture);
 }
 
 bool StylizedMaterial::init(const StylizedMaterialDesc& desc, bool skinned)
@@ -120,6 +127,7 @@ bool StylizedMaterial::init(const StylizedMaterialDesc& desc, bool skinned)
     _skinned = skinned;
 
     AX_SAFE_RETAIN(desc.baseTexture);
+    AX_SAFE_RETAIN(desc.toonRampTexture);
     _desc = desc;
     applyCullState();
     applyMaterialUniforms();
@@ -158,6 +166,7 @@ Material* StylizedMaterial::clone() const
     material->_worldToShadowTexture = _worldToShadowTexture;
 
     AX_SAFE_RETAIN(material->_desc.baseTexture);
+    AX_SAFE_RETAIN(material->_desc.toonRampTexture);
 
     for (const auto& technique : _techniques)
     {
@@ -223,6 +232,11 @@ bool StylizedMaterial::setDescription(const StylizedMaterialDesc& desc)
     {
         AX_SAFE_RETAIN(desc.baseTexture);
         AX_SAFE_RELEASE(_desc.baseTexture);
+    }
+    if (desc.toonRampTexture != _desc.toonRampTexture)
+    {
+        AX_SAFE_RETAIN(desc.toonRampTexture);
+        AX_SAFE_RELEASE(_desc.toonRampTexture);
     }
 
     _desc = desc;
@@ -316,18 +330,26 @@ uint32_t StylizedMaterial::getShadowProgramType() const noexcept
 }
 
 float StylizedMaterial::evaluateRimMask(float fresnel,
-                                        float lightFacing,
+                                        float signedLightFacing,
                                         float shadowVisibility,
                                         float mainLightLuminance,
                                         float rimStart,
                                         float rimEnd,
+                                        float rimPower,
+                                        float rimLightThreshold,
+                                        float rimLightSoftness,
                                         float intensity) noexcept
 {
-    const float range = std::max(rimEnd - rimStart, kMinimumRimRange);
-    const float t     = std::clamp((fresnel - rimStart) / range, 0.0F, 1.0F);
-    const float rim   = t * t * (3.0F - 2.0F * t);
-    return rim * std::max(lightFacing, 0.0F) * std::clamp(shadowVisibility, 0.0F, 1.0F) *
-           std::max(mainLightLuminance, 0.0F) * std::max(intensity, 0.0F);
+    const float range          = std::max(rimEnd - rimStart, kMinimumRimRange);
+    const float shapedFresnel  = std::pow(std::clamp(fresnel, 0.0F, 1.0F), std::max(rimPower, 0.1F));
+    const float t              = std::clamp((shapedFresnel - rimStart) / range, 0.0F, 1.0F);
+    const float rim            = t * t * (3.0F - 2.0F * t);
+    const float directionRange = std::max(rimLightSoftness * 2.0F, kMinimumRimRange);
+    const float directionT =
+        std::clamp((signedLightFacing - (rimLightThreshold - rimLightSoftness)) / directionRange, 0.0F, 1.0F);
+    const float directionalRim = directionT * directionT * (3.0F - 2.0F * directionT);
+    return rim * directionalRim * std::clamp(shadowVisibility, 0.0F, 1.0F) * std::max(mainLightLuminance, 0.0F) *
+           std::max(intensity, 0.0F);
 }
 
 void StylizedMaterial::setDebugView(StylizedDebugView debugView)
@@ -340,14 +362,18 @@ void StylizedMaterial::setDebugView(StylizedDebugView debugView)
 
 void StylizedMaterial::applyMaterialUniforms()
 {
-    const std::array<Vec4, 7> values = {
+    const std::array<Vec4, 10> values = {
         toVec4(_desc.baseColor),
         toVec4(_desc.highlightColor),
         toVec4(_desc.shadowColor),
         toVec4(_desc.diffuseTint),
         toVec4(_desc.rimColor),
         Vec4{_desc.bandThreshold, _desc.bandSoftness, _desc.rimStart, _desc.rimEnd},
-        Vec4{_desc.rimIntensity, _desc.alphaCutoff, static_cast<float>(static_cast<uint8_t>(_debugView)), 0.0F},
+        Vec4{_desc.rimIntensity, _desc.alphaCutoff, static_cast<float>(static_cast<uint8_t>(_debugView)),
+             _desc.rampTextureStrength},
+        Vec4{_desc.minimumBrightness, _desc.unlitStrength, _desc.subsurfaceStrength, _desc.subsurfaceFalloff},
+        toVec4(_desc.subsurfaceColor),
+        Vec4{_desc.rimPower, _desc.rimLightThreshold, _desc.rimLightSoftness, 0.0F},
     };
     const float cosine                    = std::cos(_desc.uvRotation);
     const float sine                      = std::sin(_desc.uvRotation);
@@ -360,6 +386,9 @@ void StylizedMaterial::applyMaterialUniforms()
     {
         pass->setUniformStylizedMaterial(values.data(), sizeof(values));
         pass->setUniformStylizedUvTransform(uvTransform.data(), sizeof(uvTransform));
+        auto* rampTexture = _desc.toonRampTexture ? _desc.toonRampTexture
+                                                  : Director::getInstance()->getTextureCache()->getWhiteTexture();
+        pass->setUniformStylizedRampMap(rampTexture->getRHITexture());
     }
 }
 
@@ -393,6 +422,7 @@ void StylizedMaterial::installContextRestoreListener()
         // abandoned, then the renderer installs the new atlas next frame.
         _shadowMap     = nullptr;
         _shadowEnabled = false;
+        applyMaterialUniforms();
         applyShadowUniforms();
     });
     Director::getInstance()->getEventDispatcher()->addEventListenerWithFixedPriority(_rendererRecreatedListener, -3);

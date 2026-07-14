@@ -140,6 +140,7 @@ public:
     void setUniformShadowEnabled(const void*, size_t);
     void setUniformShadowParams(const void*, size_t);
     void setUniformMainShadowMap(rhi::Texture* texture);
+    void setUniformStylizedRampMap(rhi::Texture* texture);
 
 protected:
     Pass();
@@ -201,6 +202,7 @@ private:
     rhi::UniformLocation _locShadowEnabled;
     rhi::UniformLocation _locShadowParams;
     rhi::UniformLocation _locMainShadowMap;
+    rhi::UniformLocation _locStylizedRampMap;
 
     // renderer state cache variables
     bool _rendererDepthTestEnabled         = true;

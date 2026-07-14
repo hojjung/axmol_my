@@ -188,6 +188,7 @@ void Pass::initUniformLocations()
     _locShadowEnabled       = ps->getUniformLocation("u_shadowEnabled");
     _locShadowParams        = ps->getUniformLocation("u_shadowParams");
     _locMainShadowMap       = ps->getUniformLocation("u_mainShadowMap");
+    _locStylizedRampMap     = ps->getUniformLocation("u_toonRamp");
 }
 
 void Pass::draw(MeshCommand* meshCommand,
@@ -434,6 +435,12 @@ void Pass::setUniformMainShadowMap(rhi::Texture* texture)
 {
     if (_locMainShadowMap)
         _programState->setTexture(_locMainShadowMap, 1, texture);
+}
+
+void Pass::setUniformStylizedRampMap(rhi::Texture* texture)
+{
+    if (_locStylizedRampMap)
+        _programState->setTexture(_locStylizedRampMap, 2, texture);
 }
 
 }  // namespace ax

@@ -13,9 +13,10 @@ layout(location = NORMAL) in vec3 v_worldNormal;
 
 layout(set = SAMPLER_SET, binding = 0) uniform sampler2D u_tex0;
 layout(set = SAMPLER_SET, binding = 1, sampler_slot = ShadowCmpClamp) uniform sampler2DShadow u_mainShadowMap;
+layout(set = SAMPLER_SET, binding = 2) uniform sampler2D u_toonRamp;
 
 layout(std140, set = UNIFORM_SET, binding = FS_UB_BINDING) uniform fs_ub {
-    vec4 u_stylizedMaterial[7];
+    vec4 u_stylizedMaterial[10];
     vec4 u_stylizedLightData[9];
     vec2 u_shadowTexelSize;
     float u_shadowBias;
@@ -114,17 +115,26 @@ void main()
     float mainLightEnabled = u_stylizedLightData[0].w;
 
     float signedNdotL = clamp(dot(normal, mainLightDirection), -1.0, 1.0);
-    float lightFacing = max(signedNdotL, 0.0) * mainLightEnabled;
     float halfLambert = signedNdotL * 0.5 + 0.5;
     float bandSoftness = max(max(u_stylizedMaterial[5].y, fwidth(halfLambert)), 0.0001);
     float toonBand = smoothstep(u_stylizedMaterial[5].x - bandSoftness,
                                 u_stylizedMaterial[5].x + bandSoftness,
                                 halfLambert);
     float shadowVisibility = sampleMainShadow();
-    float litBand = toonBand * shadowVisibility * mainLightEnabled;
+    float mainLuminance = dot(mainLightColor, vec3(0.2126, 0.7152, 0.0722));
+    float mainVisibility = shadowVisibility * mainLightEnabled;
 
-    vec3 highlight = u_stylizedMaterial[1].rgb * mainLightColor;
-    vec3 directTint = mix(u_stylizedMaterial[2].rgb, highlight, litBand);
+    vec3 textureRamp = texture(u_toonRamp, vec2(clamp(halfLambert, 0.001, 0.999), 0.5)).rgb;
+    vec3 ramp = mix(vec3(toonBand), textureRamp, clamp(u_stylizedMaterial[6].w, 0.0, 1.0));
+    ramp *= clamp(u_stylizedMaterial[3].rgb + vec3(halfLambert), 0.0, 1.0);
+
+    float subsurfaceCurve = 1.0 - pow(clamp(halfLambert, 0.0, 1.0), u_stylizedMaterial[7].w);
+    float subsurfaceMask = subsurfaceCurve * u_stylizedMaterial[7].z * mainLightEnabled * mainLuminance;
+    vec3 shadowColor = mix(u_stylizedMaterial[2].rgb, u_stylizedMaterial[8].rgb, clamp(subsurfaceMask, 0.0, 1.0));
+    vec3 accumulatedRamp = clamp(ramp * mainLuminance * mainVisibility, 0.0, 1.0);
+    vec3 accumulatedColor = ramp * mainLightColor * mainVisibility;
+    vec3 directTint = accumulatedColor * u_stylizedMaterial[1].rgb +
+                      (vec3(1.0) - accumulatedRamp) * shadowColor;
     vec3 pointDiffuse = vec3(0.0);
 
     for (int pointIndex = 0; pointIndex < 2; ++pointIndex)
@@ -143,14 +153,18 @@ void main()
 
     vec3 viewDirection = normalize(u_stylizedLightData[3].xyz - v_worldPosition);
     float fresnel = 1.0 - max(dot(normal, viewDirection), 0.0);
-    float rim = smoothstep(u_stylizedMaterial[5].z, u_stylizedMaterial[5].w, fresnel);
-    float mainLuminance = dot(mainLightColor, vec3(0.2126, 0.7152, 0.0722));
-    rim *= lightFacing * shadowVisibility * mainLuminance * u_stylizedMaterial[6].x;
+    float shapedFresnel = pow(clamp(fresnel, 0.0, 1.0), u_stylizedMaterial[9].x);
+    float rim = smoothstep(u_stylizedMaterial[5].z, u_stylizedMaterial[5].w, shapedFresnel);
+    float rimDirectionSoftness = max(u_stylizedMaterial[9].z, fwidth(signedNdotL));
+    float directionalRim = smoothstep(u_stylizedMaterial[9].y - rimDirectionSoftness,
+                                      u_stylizedMaterial[9].y + rimDirectionSoftness,
+                                      signedNdotL);
+    rim *= directionalRim * shadowVisibility * mainLuminance * mainLightEnabled * u_stylizedMaterial[6].x;
 
     int debugView = int(u_stylizedMaterial[6].z + 0.5);
     if (debugView == 1)
     {
-        FragColor = vec4(vec3(toonBand), 1.0);
+        FragColor = vec4(vec3(dot(ramp, vec3(0.2126, 0.7152, 0.0722))), 1.0);
         return;
     }
     if (debugView == 2)
@@ -164,8 +178,10 @@ void main()
         return;
     }
 
-    vec3 lighting = directTint + u_stylizedLightData[2].rgb + pointDiffuse;
-    vec3 color = albedo.rgb * u_stylizedMaterial[3].rgb * lighting;
+    vec3 ambient = max(u_stylizedLightData[2].rgb, vec3(u_stylizedMaterial[7].x));
+    vec3 lighting = directTint + ambient + pointDiffuse;
+    vec3 color = albedo.rgb * lighting;
+    color = max(color, albedo.rgb * u_stylizedMaterial[7].y);
     color += u_stylizedMaterial[4].rgb * rim;
     FragColor = vec4(linearToSrgb(color), albedo.a);
 }

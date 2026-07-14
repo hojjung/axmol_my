@@ -25,8 +25,11 @@ TEST_CASE("Stylized material defaults match the two-band reference")
     CHECK_FALSE(material.isAlphaCutout());
     CHECK(material.bandThreshold == doctest::Approx(0.7F));
     CHECK(material.bandSoftness == doctest::Approx(0.25F));
+    CHECK(material.rampTextureStrength == doctest::Approx(0.0F));
+    CHECK(material.subsurfaceStrength == doctest::Approx(0.0F));
     CHECK(material.rimStart == doctest::Approx(0.7F));
     CHECK(material.rimEnd == doctest::Approx(1.0F));
+    CHECK(material.rimPower == doctest::Approx(1.0F));
     CHECK_FALSE(material.doubleSided);
 }
 
@@ -83,6 +86,14 @@ TEST_CASE("Stylized material rejects ambiguous band and rim ranges")
     material.alphaCutoff = 0.5F;
     CHECK(material.isValid());
     CHECK(material.isAlphaCutout());
+
+    material                     = {};
+    material.rampTextureStrength = 1.01F;
+    CHECK_FALSE(material.isValid());
+
+    material                  = {};
+    material.rimLightSoftness = -0.01F;
+    CHECK_FALSE(material.isValid());
 }
 
 TEST_CASE("Stylized rim is zero in full shadow and monotonic across penumbra")
@@ -93,19 +104,29 @@ TEST_CASE("Stylized rim is zero in full shadow and monotonic across penumbra")
     constexpr float kMainLuminance     = 1.25F;
     constexpr float kRimStart          = 0.7F;
     constexpr float kRimEnd            = 1.0F;
+    constexpr float kRimPower          = 1.0F;
+    constexpr float kLightThreshold    = 0.05F;
+    constexpr float kLightSoftness     = 0.1F;
     constexpr float kIntensity         = 0.9F;
 
     const float fullShadow =
-        StylizedMaterial::evaluateRimMask(kFresnel, kLightFacing, 0.0F, kMainLuminance, kRimStart, kRimEnd, kIntensity);
+        StylizedMaterial::evaluateRimMask(kFresnel, kLightFacing, 0.0F, kMainLuminance, kRimStart, kRimEnd, kRimPower,
+                                          kLightThreshold, kLightSoftness, kIntensity);
     CHECK(fullShadow <= kEightBitTolerance);
 
-    float previous =
-        StylizedMaterial::evaluateRimMask(kFresnel, kLightFacing, 1.0F, kMainLuminance, kRimStart, kRimEnd, kIntensity);
+    const float unlitSide =
+        StylizedMaterial::evaluateRimMask(kFresnel, -kLightFacing, 1.0F, kMainLuminance, kRimStart, kRimEnd, kRimPower,
+                                          kLightThreshold, kLightSoftness, kIntensity);
+    CHECK(unlitSide <= kEightBitTolerance);
+
+    float previous = StylizedMaterial::evaluateRimMask(kFresnel, kLightFacing, 1.0F, kMainLuminance, kRimStart, kRimEnd,
+                                                       kRimPower, kLightThreshold, kLightSoftness, kIntensity);
     for (int step = 1; step <= 16; ++step)
     {
         const float visibility = 1.0F - static_cast<float>(step) / 16.0F;
-        const float current    = StylizedMaterial::evaluateRimMask(kFresnel, kLightFacing, visibility, kMainLuminance,
-                                                                   kRimStart, kRimEnd, kIntensity);
+        const float current =
+            StylizedMaterial::evaluateRimMask(kFresnel, kLightFacing, visibility, kMainLuminance, kRimStart, kRimEnd,
+                                              kRimPower, kLightThreshold, kLightSoftness, kIntensity);
         CHECK(current <= previous);
         previous = current;
     }

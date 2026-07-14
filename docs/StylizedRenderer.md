@@ -18,7 +18,7 @@
 
 Skinned mesh의 frustum 판정은 현재 bone palette가 변환한 bind-pose AABB의 보수적 합집합을 사용한다. Shadow cascade는 카메라 receiver frustum뿐 아니라 main-light 상류의 `shadowDistance` caster 영역도 depth 범위에 포함한다.
 
-메인 조명은 Half-Lambert(`N dot L * 0.5 + 0.5`)와 derivative-aware `smoothstep` 2-band를 사용한다. Rim은 다음 항을 모두 곱한다.
+메인 조명은 Half-Lambert(`N dot L * 0.5 + 0.5`)와 derivative-aware `smoothstep` 2-band를 사용한다. 재질별 1D ramp LUT가 있으면 분석적 band와 선형 보간해 색과 명암의 전이를 제어한다. AC형 subsurface fill은 음영 쪽만 밝히며, 최저 밝기와 unlit floor는 모바일 저정밀·어두운 환경에서도 캐릭터의 색 덩어리를 보존한다. Rim은 다음 항을 모두 곱한다.
 
 ```text
 fresnel * main-light facing * directional shadow visibility * main-light luminance
@@ -48,19 +48,30 @@ stylized->setMainLight(mainDirectionalLight);
 
 ax::StylizedMaterialDesc materialDesc;
 materialDesc.baseTexture = albedo;
+materialDesc.toonRampTexture = rampLut;
+materialDesc.rampTextureStrength = 0.82F;
 materialDesc.bandThreshold = 0.7F;
 materialDesc.bandSoftness = 0.25F;
 materialDesc.shadowColor = ax::Color{0.25F, 0.25F, 0.25F, 1.0F};
-materialDesc.rimStart = 0.7F;
-materialDesc.rimEnd = 1.0F;
-materialDesc.rimIntensity = 1.0F;
+materialDesc.diffuseTint = ax::Color{1.0F, 0.929F, 0.75F, 1.0F};
+materialDesc.minimumBrightness = 0.092F;
+materialDesc.unlitStrength = 0.5F;
+materialDesc.subsurfaceColor = ax::Color{1.0F, 0.45F, 0.38F, 1.0F};
+materialDesc.subsurfaceStrength = 0.328F;
+materialDesc.subsurfaceFalloff = 2.31F;
+materialDesc.rimStart = 0.0F;
+materialDesc.rimEnd = 0.82F;
+materialDesc.rimPower = 2.2F;
+materialDesc.rimLightThreshold = 0.04F;
+materialDesc.rimLightSoftness = 0.14F;
+materialDesc.rimIntensity = 0.75F;
 
 mesh->setMaterial(ax::StylizedMaterial::create(materialDesc));
 meshRenderer->setCastShadow(true);
 meshRenderer->setReceiveShadow(true);
 ```
 
-명시적 main light가 없으면 Scene의 첫 enabled directional light를 사용한다. Rim과 dynamic shadow는 이 light 하나만 사용한다.
+명시적 main light가 없으면 Scene의 첫 enabled directional light를 사용한다. Rim과 dynamic shadow는 이 light 하나만 사용한다. `toonRampTexture`는 높이 1 이상의 linear clamp texture여야 하며, 가로축을 Half-Lambert 입력으로 샘플링한다.
 
 ## 품질 프리셋
 

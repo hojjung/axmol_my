@@ -635,7 +635,7 @@ void Mesh::drawStylizedShadow(Renderer& renderer,
 
     auto* pass        = _stylizedShadowMaterial->getTechnique()->getPassByIndex(0);
     const auto toVec4 = [](const Color& value) { return Vec4{value.r, value.g, value.b, value.a}; };
-    const std::array<Vec4, 7> materialValues = {
+    const std::array<Vec4, 10> materialValues = {
         toVec4(sourceMaterial._desc.baseColor),
         toVec4(sourceMaterial._desc.highlightColor),
         toVec4(sourceMaterial._desc.shadowColor),
@@ -643,7 +643,13 @@ void Mesh::drawStylizedShadow(Renderer& renderer,
         toVec4(sourceMaterial._desc.rimColor),
         Vec4{sourceMaterial._desc.bandThreshold, sourceMaterial._desc.bandSoftness, sourceMaterial._desc.rimStart,
              sourceMaterial._desc.rimEnd},
-        Vec4{sourceMaterial._desc.rimIntensity, sourceMaterial._desc.alphaCutoff, 0.0F, 0.0F},
+        Vec4{sourceMaterial._desc.rimIntensity, sourceMaterial._desc.alphaCutoff, 0.0F,
+             sourceMaterial._desc.rampTextureStrength},
+        Vec4{sourceMaterial._desc.minimumBrightness, sourceMaterial._desc.unlitStrength,
+             sourceMaterial._desc.subsurfaceStrength, sourceMaterial._desc.subsurfaceFalloff},
+        toVec4(sourceMaterial._desc.subsurfaceColor),
+        Vec4{sourceMaterial._desc.rimPower, sourceMaterial._desc.rimLightThreshold,
+             sourceMaterial._desc.rimLightSoftness, 0.0F},
     };
     pass->setUniformStylizedMaterial(materialValues.data(), sizeof(materialValues));
     const float uvCosine                  = std::cos(sourceMaterial._desc.uvRotation);
