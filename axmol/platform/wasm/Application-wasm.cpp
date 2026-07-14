@@ -29,20 +29,143 @@ THE SOFTWARE.
 #if AX_TARGET_PLATFORM == AX_PLATFORM_WASM
 
 #    include "axmol/platform/wasm/Application-wasm.h"
-#    include "axmol/platform/wasm/devtools-wasm.h"
+#    if AX_WASM_ENABLE_DEVTOOLS
+#        include "axmol/platform/wasm/devtools-wasm.h"
+#    endif
 #    include <unistd.h>
 #    include <sys/time.h>
 #    include <string>
 #    include "axmol/base/Director.h"
 #    include "axmol/base/Utils.h"
+#    include "axmol/platform/GL.h"
 #    include "axmol/platform/FileUtils.h"
 #    include "axmol/platform/Device.h"
 #    include "axmol/tlx/utility.hpp"
+#    include <algorithm>
+#    include <array>
 #    include <emscripten/emscripten.h>
+#    include <emscripten/html5_webgl.h>
+#    if defined(AX_ENABLE_3D) && AX_ENABLE_3D
+#        include "axmol/3d/StylizedRenderer.h"
+#        include "axmol/scene/Scene.h"
+#    endif
 
 extern void _axmolPerformFrameBoundaryTasks();
 
 extern void axmol_wasm_app_exit();
+
+namespace
+{
+constexpr size_t WEBGL_GPU_QUERY_COUNT = 4;
+
+class WebGLGpuFrameTimer final
+{
+public:
+    void initialize()
+    {
+        abandon();
+        const auto context = emscripten_webgl_get_current_context();
+        if (context <= 0 || !emscripten_webgl_enable_extension(context, "EXT_disjoint_timer_query_webgl2"))
+            return;
+
+        std::array<GLuint, WEBGL_GPU_QUERY_COUNT> ids{};
+        glGenQueries(static_cast<GLsizei>(ids.size()), ids.data());
+        for (size_t index = 0; index < ids.size(); ++index)
+            _queries[index].id = ids[index];
+        _supported = std::all_of(ids.begin(), ids.end(), [](GLuint id) { return id != 0; });
+    }
+
+    void begin()
+    {
+        if (!_supported || _activeQuery != INVALID_QUERY)
+            return;
+
+        consumeCompletedQueries();
+        for (size_t offset = 0; offset < _queries.size(); ++offset)
+        {
+            const size_t index = (_nextQuery + offset) % _queries.size();
+            if (_queries[index].pending)
+                continue;
+
+            glBeginQuery(GL_TIME_ELAPSED_EXT, _queries[index].id);
+            _activeQuery = index;
+            _nextQuery   = (index + 1) % _queries.size();
+            return;
+        }
+    }
+
+    void end()
+    {
+        if (_activeQuery == INVALID_QUERY)
+            return;
+        glEndQuery(GL_TIME_ELAPSED_EXT);
+        _queries[_activeQuery].pending = true;
+        _activeQuery                   = INVALID_QUERY;
+    }
+
+    // A lost WebGL context deletes query objects. Do not call glDeleteQueries
+    // after the loss event; just forget their now-invalid numeric names.
+    void abandon() noexcept
+    {
+        _queries     = {};
+        _activeQuery = INVALID_QUERY;
+        _nextQuery   = 0;
+        _supported   = false;
+    }
+
+private:
+    struct Query
+    {
+        GLuint id    = 0;
+        bool pending = false;
+    };
+
+    static constexpr size_t INVALID_QUERY = static_cast<size_t>(-1);
+
+    void consumeCompletedQueries()
+    {
+        GLint disjoint = GL_FALSE;
+        glGetIntegerv(GL_GPU_DISJOINT_EXT, &disjoint);
+        if (disjoint != GL_FALSE)
+        {
+            for (auto& query : _queries)
+                query.pending = false;
+            return;
+        }
+
+        for (auto& query : _queries)
+        {
+            if (!query.pending)
+                continue;
+
+            GLuint available = GL_FALSE;
+            glGetQueryObjectuiv(query.id, GL_QUERY_RESULT_AVAILABLE, &available);
+            if (available == GL_FALSE)
+                continue;
+
+            GLuint elapsedNanoseconds = 0;
+            glGetQueryObjectuiv(query.id, GL_QUERY_RESULT, &elapsedNanoseconds);
+            query.pending = false;
+
+#    if defined(AX_ENABLE_3D) && AX_ENABLE_3D
+            auto* director = ax::Director::getInstance();
+            auto* scene    = director ? director->getRunningScene() : nullptr;
+            auto* renderer = scene ? ax::StylizedRenderer::get(*scene) : nullptr;
+            if (renderer)
+                renderer->recordGpuFrameTime(static_cast<float>(elapsedNanoseconds) * 1.0e-6F);
+#    endif
+        }
+    }
+
+    std::array<Query, WEBGL_GPU_QUERY_COUNT> _queries{};
+    size_t _activeQuery = INVALID_QUERY;
+    size_t _nextQuery   = 0;
+    bool _supported     = false;
+};
+
+WebGLGpuFrameTimer s_gpuFrameTimer;
+bool s_webglContextLost = false;
+}  // namespace
 
 extern "C" {
 //
@@ -56,6 +179,8 @@ EMSCRIPTEN_KEEPALIVE void axmol_hdoc_visibilitychange(bool hidden)
 EMSCRIPTEN_KEEPALIVE void axmol_webglcontextlost()
 {
     AXLOGI("receive event: webglcontextlost");
+    s_webglContextLost = true;
+    s_gpuFrameTimer.abandon();
 }
 
 // webglcontextrestored
@@ -71,8 +196,11 @@ EMSCRIPTEN_KEEPALIVE void axmol_webglcontextrestored()
 #    if AX_ENABLE_CONTEXT_LOSS_RECOVERY
     ax::VolatileTextureMgr::reloadAllTextures();
 #    endif
+    s_gpuFrameTimer.initialize();
+    s_webglContextLost = false;
 }
 
+#    if AX_WASM_ENABLE_DEVTOOLS
 EMSCRIPTEN_KEEPALIVE void axmol_dev_pause()
 {
     ax::DevToolsImpl::getInstance()->pause();
@@ -87,6 +215,7 @@ EMSCRIPTEN_KEEPALIVE void axmol_dev_step()
 {
     ax::DevToolsImpl::getInstance()->step();
 }
+#    endif
 }
 
 namespace ax
@@ -108,6 +237,15 @@ static void updateFrame()
 {
     double now = emscripten_get_now();  // current time in ms
     _axmolPerformFrameBoundaryTasks();  // Perform any pending frame boundary tasks before processing the next frame.
+
+    // Browsers keep requestAnimationFrame alive while a WebGL context is lost.
+    // Skip engine rendering until the restored event has rebuilt GPU resources.
+    if (s_webglContextLost) [[unlikely]]
+    {
+        s_lastFrameTime = now;
+        s_accumulator   = 0.0;
+        return;
+    }
 
     // First frame: render immediately
     if (s_lastFrameTime <= 0.0) [[unlikely]]
@@ -153,7 +291,9 @@ static void stepFrame()
     auto director   = __director;
     auto renderView = director->getRenderView();
 
+    s_gpuFrameTimer.begin();
     director->stepFrame();
+    s_gpuFrameTimer.end();
 
     if (renderView->windowShouldClose())
     {
@@ -176,7 +316,7 @@ static void getCurrentLangISO2(char buf[16])
     // clang-format off
     EM_ASM_ARGS(
         {
-            var lang = localStorage.getItem('localization_language');
+            var lang = window.localStorage.getItem('localization_language');
             if (lang == null)
             {
                 stringToUTF8(window.navigator.language.replace(/-.*/, ""), $0, 16);
@@ -212,6 +352,7 @@ int Application::run()
     }
 
     __director = Director::getInstance();
+    s_gpuFrameTimer.initialize();
 
     // Retain glview to avoid glview being released in the while loop
     __director->getRenderView()->retain();

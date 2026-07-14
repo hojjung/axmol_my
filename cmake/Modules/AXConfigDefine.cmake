@@ -203,11 +203,13 @@ if(APPLE)
 endif()
 
 if(EMSCRIPTEN)
-  # Tell emcc build port libjpeg(not in sysroot)
-  list(APPEND _ax_c_flags "-sUSE_LIBJPEG=1")
+  if(NOT DEFINED AX_USE_JPEG OR AX_USE_JPEG)
+    # Tell emcc to build the libjpeg port (not in the default sysroot).
+    list(APPEND _ax_c_flags "-sUSE_LIBJPEG=1")
 
-  # fix build fail on windows host when cmake invoking emscan-deps (raise unknown options)
-  list(APPEND _ax_link_opts  "-ljpeg")
+    # Keep the port on the final link line and avoid emscan-deps on Windows hosts.
+    list(APPEND _ax_link_opts "-ljpeg")
+  endif()
 
   list(APPEND _ax_compile_opts "-fwasm-exceptions")
   list(APPEND _ax_link_opts "-fwasm-exceptions")

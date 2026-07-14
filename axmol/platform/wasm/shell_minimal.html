@@ -137,13 +137,36 @@
         canvas: (function() {
           var canvas = document.getElementById('canvas');
 
-          // As a default initial behavior, pop up an alert when webgl context is lost. To make your
-          // application robust, you may want to override this behavior before shipping!
-          // See http://www.khronos.org/registry/webgl/specs/latest/1.0/#5.15.2
-          canvas.addEventListener("webglcontextlost", function(e) { Module.ccall('axmol_webglcontextlost'); alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
-          canvas.addEventListener("webglcontextrestored", function(e) { Module.ccall('axmol_webglcontextrestored'); e.preventDefault(); }, false);
+          // Prevent the browser from discarding the context permanently. Axmol
+          // rebuilds renderer resources from axmol_webglcontextrestored().
+          window.axmolContextRecovery = { lost: 0, restored: 0 };
+          function updateContextRecoveryState() {
+            var lost = String(window.axmolContextRecovery.lost);
+            var restored = String(window.axmolContextRecovery.restored);
+            canvas.setAttribute('data-axmol-context-lost', lost);
+            canvas.setAttribute('data-axmol-context-restored', restored);
+            document.documentElement.setAttribute('data-axmol-context-lost', lost);
+            document.documentElement.setAttribute('data-axmol-context-restored', restored);
+          }
+          updateContextRecoveryState();
+          canvas.addEventListener("webglcontextlost", function(e) {
+            e.preventDefault();
+            window.axmolContextRecovery.lost++;
+            updateContextRecoveryState();
+            Module.setStatus('WebGL context lost; rebuilding...');
+            Module.ccall('axmol_webglcontextlost', null, [], []);
+          }, false);
+          canvas.addEventListener("webglcontextrestored", function(e) {
+            e.preventDefault();
+            Module.ccall('axmol_webglcontextrestored', null, [], []);
+            window.axmolContextRecovery.restored++;
+            updateContextRecoveryState();
+            Module.setStatus('WebGL context restored');
+          }, false);
 
-          document.addEventListener("visibilitychange", () => { Module.ccall('axmol_hdoc_visibilitychange', document.hidden); });
+          document.addEventListener("visibilitychange", () => {
+            Module.ccall('axmol_hdoc_visibilitychange', null, ['number'], [document.hidden ? 1 : 0]);
+          });
 
           return canvas;
         })(),
@@ -174,52 +197,58 @@
         }
       };
       Module.setStatus('Downloading...');
-      window.onerror = function() {
+      var reportingWindowError = false;
+      window.onerror = function(message, source, line, column, error) {
+        if (reportingWindowError) return false;
+        reportingWindowError = true;
+        var detail = '[window.onerror] ' + String(message) + ' @ ' +
+                     (source || '<unknown>') + ':' + (line || 0) + ':' + (column || 0);
+        try {
+          Module.printErr(detail);
+          if (error && error.stack) Module.printErr(error.stack);
+        } catch (reportingError) {
+          console.error(detail);
+          console.error(error && error.stack ? error.stack : reportingError);
+        }
         Module.setStatus('Exception thrown, see JavaScript console');
         Module.setStatus = function(text) {
           if (text) Module.printErr('[post-exception status] ' + text);
         };
+        reportingWindowError = false;
+        return false;
       };
     </script>
     <script type='text/javascript'>
-      Module.preRun.push(function() {
-        addRunDependency('sync_writable_path')
-        FS.mkdir('/axmolPersistPath')
-        FS.mount(IDBFS, {}, '/axmolPersistPath')
-        FS.syncfs(true, function (err) {
-          if (err) {
-            throw err
-          }
-          removeRunDependency('sync_writable_path')
-        })
-        // #region axmol-spec, enable output as-is to console without split by \n
-        TTY.stream_ops.write = function(stream, buffer, offset, length, pos) {
-          var tty = stream.tty;
-          if (!tty || !tty.ops.put_char) {
-            throw new FS.ErrnoError(60);
-          }
-          try {
-            for (var i = 0; i < length; i++) {
-              var val = buffer[offset+i];
-              if (val === null) {
-                continue;
-              } else {
-                if (val != 0) tty.output.push(val); // val == 0 would cut text output off in the middle.
-              }
-            }
-          } catch (e) {
-            throw new FS.ErrnoError(29);
-          }
-          out(UTF8ArrayToString(tty.output, 0));
-          tty.output = [];
-          if (length) {
-            stream.node.timestamp = Date.now();
-          }
-          return i;
+      Module.postRun.push(function() {
+        if (new URLSearchParams(window.location.search).get('context-loss-test') !== '1') return;
+        var context = Module.canvas.getContext('webgl2');
+        var extension = context && context.getExtension('WEBGL_lose_context');
+        if (!extension) {
+          Module.printErr('WEBGL_lose_context is unavailable; context restore smoke skipped');
+          return;
         }
-        //  #endregion axmol-spec
+        setTimeout(function() {
+          extension.loseContext();
+          setTimeout(function() { extension.restoreContext(); }, 1000);
+        }, 1000);
       })
     </script>
+#if PTHREADS
+    <script>
+      (function() {
+        document.documentElement.dataset.axmolCrossOriginIsolated =
+          (window.crossOriginIsolated === true && typeof SharedArrayBuffer !== 'undefined') ? '1' : '0';
+        if (window.crossOriginIsolated === true && typeof SharedArrayBuffer !== 'undefined') return;
+        var message = 'This Axmol build uses WebAssembly threads and requires cross-origin isolation. ' +
+                      'Serve COOP: same-origin and COEP: require-corp (or credentialless), ' +
+                      'or rebuild with -DAX_WASM_THREADS=0.';
+        window.axmolPthreadPreflightFailed = true;
+        Module.setStatus(message);
+        Module.printErr(message);
+        window.stop();
+      })();
+    </script>
+#endif
     {{{ SCRIPT }}}
   </body>
 </html>

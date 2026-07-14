@@ -97,21 +97,38 @@
             },
             canvas: (function() {
                 var canvas = document.getElementById('canvas');
+                window.axmolContextRecovery = { lost: 0, restored: 0 };
+                function updateContextRecoveryState() {
+                    var lost = String(window.axmolContextRecovery.lost);
+                    var restored = String(window.axmolContextRecovery.restored);
+                    canvas.setAttribute('data-axmol-context-lost', lost);
+                    canvas.setAttribute('data-axmol-context-restored', restored);
+                    document.documentElement.setAttribute('data-axmol-context-lost', lost);
+                    document.documentElement.setAttribute('data-axmol-context-restored', restored);
+                }
+                updateContextRecoveryState();
 
                 // Axmol specific event handlers
                 canvas.addEventListener("webglcontextlost", function(e) {
-                    if (Module.ccall) {
-                        Module.ccall("axmol_webglcontextlost");
-                    }
-                    alert('WebGL context lost. You will need to reload the page.');
                     e.preventDefault();
+                    window.axmolContextRecovery.lost++;
+                    updateContextRecoveryState();
+                    statusElement.classList.remove('hidden');
+                    Module.setStatus('WebGL context lost; rebuilding...');
+                    if (Module.ccall) {
+                        Module.ccall("axmol_webglcontextlost", null, [], []);
+                    }
                 }, false);
 
                 canvas.addEventListener("webglcontextrestored", function(e) {
-                    if (Module.ccall) {
-                        Module.ccall("axmol_webglcontextrestored");
-                    }
                     e.preventDefault();
+                    if (Module.ccall) {
+                        Module.ccall("axmol_webglcontextrestored", null, [], []);
+                    }
+                    window.axmolContextRecovery.restored++;
+                    updateContextRecoveryState();
+                    Module.setStatus('WebGL context restored');
+                    setTimeout(function() { statusElement.classList.add('hidden'); }, 500);
                 }, false);
 
                 // Document visibility change handler for Axmol
@@ -159,56 +176,65 @@
 
         Module.setStatus('Downloading...');
 
-        window.onerror = function() {
+        var reportingWindowError = false;
+        window.onerror = function(message, source, line, column, error) {
+            if (reportingWindowError) return false;
+            reportingWindowError = true;
+            var detail = '[window.onerror] ' + String(message) + ' @ ' +
+                         (source || '<unknown>') + ':' + (line || 0) + ':' + (column || 0);
+            try {
+                Module.printErr(detail);
+                if (error && error.stack) Module.printErr(error.stack);
+            } catch (reportingError) {
+                console.error(detail);
+                console.error(error && error.stack ? error.stack : reportingError);
+            }
             Module.setStatus('Exception thrown, see JavaScript console');
             spinnerElement.style.display = 'none';
             Module.setStatus = function(text) {
-                if (text) console.error('[post-exception status] ' + text);
+                if (text) Module.printErr('[post-exception status] ' + text);
             };
+            reportingWindowError = false;
+            return false;
         };
-
-        // Setup file system persistence
-        Module.preRun.push(function() {
-            addRunDependency("sync_writable_path");
-            FS.mkdir("/axmolPersistPath");
-            FS.mount(IDBFS, {}, "/axmolPersistPath");
-            FS.syncfs(true, function(err) {
-                if (err) throw err;
-                removeRunDependency("sync_writable_path");
-            });
-
-            // TTY stream operations override from original file
-            TTY.stream_ops.write = function(stream, buffer, offset, length, pos) {
-                var tty = stream.tty;
-                if (!tty || !tty.ops.put_char) {
-                    throw new FS.ErrnoError(60);
-                }
-                try {
-                    for (var i = 0; i < length; i++) {
-                        var p = buffer[offset + i];
-                        if (p !== null && p !== 0) {
-                            tty.output.push(p);
-                        }
-                    }
-                } catch (e) {
-                    throw new FS.ErrnoError(29);
-                }
-                out(UTF8ArrayToString(tty.output, 0));
-                tty.output = [];
-                if (length) {
-                    stream.node.timestamp = Date.now();
-                }
-                return i;
-            };
-        });
 
         // Hide UI elements when the application is fully loaded
         Module.postRun.push(function() {
             document.getElementById('status').classList.add('hidden');
             document.getElementById('spinner').classList.add('hidden');
             document.getElementById('progress').classList.add('hidden');
+
+            if (new URLSearchParams(window.location.search).get('context-loss-test') !== '1') return;
+            var context = Module.canvas.getContext('webgl2');
+            var extension = context && context.getExtension('WEBGL_lose_context');
+            if (!extension) {
+                Module.printErr('WEBGL_lose_context is unavailable; context restore smoke skipped');
+                return;
+            }
+            setTimeout(function() {
+                extension.loseContext();
+                setTimeout(function() { extension.restoreContext(); }, 1000);
+            }, 1000);
         });
     </script>
+#if PTHREADS
+    <script>
+        (function() {
+            document.documentElement.dataset.axmolCrossOriginIsolated =
+                (window.crossOriginIsolated === true && typeof SharedArrayBuffer !== 'undefined') ? '1' : '0';
+            if (window.crossOriginIsolated === true && typeof SharedArrayBuffer !== 'undefined') return;
+            var message = 'This Axmol build uses WebAssembly threads and requires cross-origin isolation. ' +
+                          'Serve COOP: same-origin and COEP: require-corp (or credentialless), ' +
+                          'or rebuild with -DAX_WASM_THREADS=0.';
+            window.axmolPthreadPreflightFailed = true;
+            statusElement.classList.remove('hidden');
+            spinnerElement.style.display = 'none';
+            Module.setStatus(message);
+            Module.printErr(message);
+            window.stop();
+        })();
+    </script>
+#endif
     {{{ SCRIPT }}}
 </body>
 </html>

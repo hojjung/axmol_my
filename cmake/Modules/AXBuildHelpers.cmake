@@ -665,6 +665,7 @@ macro(ax_setup_app_props app_name)
     target_link_options(${app_name} PRIVATE
       "-sEXPORTED_FUNCTIONS=[${AX_WASM_EXPORTS}]"
       "-sEXPORTED_RUNTIME_METHODS=[ccall,cwrap,HEAPU8,requestFullscreen,lengthBytesUTF8,stringToUTF8]"
+      "--pre-js=${_AX_ROOT}/axmol/platform/wasm/runtime_pre.js"
     )
     set(EMSCRIPTEN_LINK_FLAGS "-lidbfs.js -s MIN_WEBGL_VERSION=2 -s MAX_WEBGL_VERSION=2 -s STACK_SIZE=4mb --shell-file ${AX_WASM_SHELL_FILE} --use-preload-cache")
 

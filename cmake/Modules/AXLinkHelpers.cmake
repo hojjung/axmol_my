@@ -150,7 +150,6 @@ function(ax_link_cxx_prebuilt APP_NAME AX_ROOT_DIR AX_PREBUILT_DIR)
     axmol
     box2d
     freetype
-    webp
     pugixml
     xxhash
     fastlz
@@ -168,7 +167,11 @@ function(ax_link_cxx_prebuilt APP_NAME AX_ROOT_DIR AX_PREBUILT_DIR)
     websocket-parser
   )
 
-  if(AX_ENABLE_GL OR AX_ENABLE_VK)
+  if(AX_USE_WEBP)
+    list(APPEND LIBS webp)
+  endif()
+
+  if((AX_ENABLE_GL OR AX_ENABLE_VK) AND NOT (WASM AND AX_PROFILE_STYLIZED_WEB))
     list(APPEND LIBS glad)
   endif()
 
@@ -204,11 +207,14 @@ function(ax_link_cxx_prebuilt APP_NAME AX_ROOT_DIR AX_PREBUILT_DIR)
     target_link_libraries(${APP_NAME}
       ${LIBS}
       zlib
-      jpeg-static
       libcrypto
       libssl
       libcurl_imp
     )
+
+    if(AX_USE_JPEG)
+      target_link_libraries(${APP_NAME} jpeg-static)
+    endif()
 
     if(AX_ENABLE_AUDIO)
       target_link_libraries(${APP_NAME}
@@ -219,11 +225,14 @@ function(ax_link_cxx_prebuilt APP_NAME AX_ROOT_DIR AX_PREBUILT_DIR)
     target_link_libraries(${APP_NAME}
       ${LIBS}
       z
-      jpeg
       curl
       ssl
       crypto
     )
+
+    if(AX_USE_JPEG)
+      target_link_libraries(${APP_NAME} jpeg)
+    endif()
 
     if(AX_ENABLE_AUDIO)
       target_link_libraries(${APP_NAME}
