@@ -68,6 +68,7 @@ enum class FeatureType : uint32_t
     DEPTH24,
     ASTC,
     VERTEX_ATTRIB_BINDING,  // GL330 / GLES30, need detect
+    DEPTH_COMPARISON_SAMPLING,
 };
 
 /**

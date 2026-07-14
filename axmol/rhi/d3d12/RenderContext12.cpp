@@ -408,10 +408,8 @@ void RenderContextImpl::beginRenderPass(RenderTarget* renderTarget, const Render
         _currentRT    = renderTarget;
     }
 
-    // Get target size from color0
-    auto colorAttachment = rtImpl->getColorAttachment(0);
-    _renderTargetWidth   = colorAttachment->getDesc().width;
-    _renderTargetHeight  = colorAttachment->getDesc().height;
+    _renderTargetWidth  = static_cast<uint32_t>(renderTarget->getWidth());
+    _renderTargetHeight = static_cast<uint32_t>(renderTarget->getHeight());
 
     // Bind RTV/DSV and clear according to flags
     rtImpl->beginRenderPass(_currentCmdList, descriptor, _renderTargetWidth, _renderTargetHeight, _imageIndex);

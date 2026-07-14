@@ -145,6 +145,8 @@ RenderTargetImpl::Attachment RenderTargetImpl::getColorAttachment(int index) con
 {
     if (isDefaultRenderTarget())
         return index == 0 ? Attachment{_context->acquireDrawable().texture, 0} : Attachment{};
+    if (index < 0 || static_cast<size_t>(index) >= _color.size())
+        return {};
     auto& rb = this->_color[index];
     return RenderTargetImpl::Attachment{
         static_cast<bool>(rb) ? static_cast<TextureImpl*>(rb.texture)->internalHandle() : nil, rb.level};
@@ -165,6 +167,8 @@ PixelFormat RenderTargetImpl::getColorAttachmentPixelFormat(int index) const
     // the default framebuffer pixel format is: MTLPixelFormatBGRA8Unorm
     if (isDefaultRenderTarget())
         return index == 0 ? PixelFormat::BGRA8 : PixelFormat::NONE;
+    if (index < 0 || static_cast<size_t>(index) >= _color.size())
+        return PixelFormat::NONE;
     auto& rb = this->_color[index];
     return rb ? rb.texture->getPixelFormat() : PixelFormat::NONE;
 }

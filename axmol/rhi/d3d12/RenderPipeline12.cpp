@@ -27,8 +27,10 @@
 #include "axmol/rhi/d3d12/Program12.h"
 #include "axmol/rhi/d3d12/RenderContext12.h"
 #include "axmol/rhi/d3d12/Driver12.h"
+#include "axmol/rhi/d3d12/RenderTarget12.h"
 #include "axmol/base/Logging.h"
 #include "axmol/tlx/hash.hpp"
+#include <array>
 
 namespace ax::rhi::d3d12
 {
@@ -88,7 +90,8 @@ static inline uintptr_t makePSOKey(const rhi::BlendDesc& blendDesc,
                                    uint64_t programId,
                                    uint32_t vlHash,
                                    D3D12_RASTERIZER_DESC& rs,
-                                   PrimitiveGroup primitiveGroup)
+                                   PrimitiveGroup primitiveGroup,
+                                   uint64_t renderTargetHash)
 {
     if constexpr (sizeof(void*) == 8)
     {
@@ -97,8 +100,12 @@ static inline uintptr_t makePSOKey(const rhi::BlendDesc& blendDesc,
             rhi::BlendDesc blend{};
             uintptr_t dsHash;
             uint64_t progId;
+            uint64_t renderTargetHash;
         };
-        HashMe hashMe{.blend = blendDesc, .dsHash = dsState->getHash(), .progId = programId};
+        HashMe hashMe{.blend            = blendDesc,
+                      .dsHash           = dsState->getHash(),
+                      .progId           = programId,
+                      .renderTargetHash = renderTargetHash};
         const auto rasterComp =
             ((uint32_t)primitiveGroup << 16) | (rs.CullMode << 8) | (rs.FrontCounterClockwise ? 1 : 0);
         const auto seed = (uint64_t)vlHash << 32 | (uint64_t)rasterComp;
@@ -113,8 +120,15 @@ static inline uintptr_t makePSOKey(const rhi::BlendDesc& blendDesc,
             uintptr_t dsHash;
             uint64_t progId;
             uint32_t vlHash;
+            uint32_t padding;
+            uint64_t renderTargetHash;
         };
-        HashMe hashMe{.blend = blendDesc, .dsHash = dsState->getHash(), .progId = programId, .vlHash = vlHash};
+        HashMe hashMe{.blend            = blendDesc,
+                      .dsHash           = dsState->getHash(),
+                      .progId           = programId,
+                      .vlHash           = vlHash,
+                      .padding          = 0,
+                      .renderTargetHash = renderTargetHash};
         const auto rasterComp =
             ((uint32_t)primitiveGroup << 16) | (rs.CullMode << 8) | (rs.FrontCounterClockwise ? 1 : 0);
 
@@ -156,7 +170,7 @@ void RenderPipelineImpl::initializePipelineDefaults()
     _rasterDesc.DepthClipEnable       = TRUE;
 }
 
-void RenderPipelineImpl::update(const RenderTarget* /*rt*/, const PipelineDesc& desc)
+void RenderPipelineImpl::update(const RenderTarget* rt, const PipelineDesc& desc)
 {
     if (!desc.programState || !desc.vertexLayout)
     {
@@ -168,7 +182,7 @@ void RenderPipelineImpl::update(const RenderTarget* /*rt*/, const PipelineDesc& 
 
     updateBlendState(desc.blendDesc);
     updateRootSignature(program);
-    updateGraphicsPipeline(desc, program);
+    updateGraphicsPipeline(static_cast<const RenderTargetImpl*>(rt), desc, program);
 }
 
 void RenderPipelineImpl::updateBlendState(const BlendDesc& blendDesc)
@@ -292,10 +306,31 @@ void RenderPipelineImpl::updateRootSignature(ProgramImpl* program)
     _activeRootSignature = &_rootSigCache.emplace(progId, std::move(entry)).first->second;
 }
 
-void RenderPipelineImpl::updateGraphicsPipeline(const PipelineDesc& desc, ProgramImpl* program)
+void RenderPipelineImpl::updateGraphicsPipeline(const RenderTargetImpl* renderTarget,
+                                                const PipelineDesc& desc,
+                                                ProgramImpl* program)
 {
-    const auto progId = program->getProgramId();
-    auto key = makePSOKey(desc.blendDesc, _dsState, progId, desc.vertexLayout->getHash(), _rasterDesc, _primitiveGroup);
+    struct RenderTargetFormats
+    {
+        std::array<DXGI_FORMAT, D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT> colors{};
+        DXGI_FORMAT depth{DXGI_FORMAT_UNKNOWN};
+        uint32_t colorCount{0};
+    } formats;
+
+    formats.colorCount = renderTarget->getColorAttachmentCount();
+    for (uint32_t i = 0; i < formats.colorCount; ++i)
+    {
+        const auto attachment = renderTarget->getColorAttachment(static_cast<int>(i));
+        AXASSERT(attachment, "D3D12 color attachment count is inconsistent");
+        formats.colors[i] = dxutils::toDxgiFormatInfo(attachment->getPixelFormat())->format;
+    }
+    if (const auto depthAttachment = renderTarget->getDepthStencilAttachment())
+        formats.depth = dxutils::toDxgiFormatInfo(depthAttachment->getPixelFormat())->fmtDsv;
+
+    const uint64_t renderTargetHash = tlx::hash_bytes(&formats, sizeof(formats), 0);
+    const auto progId               = program->getProgramId();
+    auto key = makePSOKey(desc.blendDesc, _dsState, progId, desc.vertexLayout->getHash(), _rasterDesc, _primitiveGroup,
+                          renderTargetHash);
     auto it  = _psoCache.find(key);
     if (it != _psoCache.end())
     {
@@ -320,11 +355,12 @@ void RenderPipelineImpl::updateGraphicsPipeline(const PipelineDesc& desc, Progra
     psoDesc.DepthStencilState     = _dsState->getD3D12DepthStencilDesc();
     psoDesc.InputLayout           = vi;
     psoDesc.PrimitiveTopologyType = kPrimitiveTopologyTypes[(uint32_t)_primitiveGroup];
-    psoDesc.NumRenderTargets      = 1;
-    psoDesc.RTVFormats[0]         = DXGI_FORMAT_R8G8B8A8_UNORM;
-    psoDesc.DSVFormat             = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    psoDesc.SampleDesc.Count      = 1;
-    psoDesc.SampleMask            = UINT_MAX;
+    psoDesc.NumRenderTargets      = formats.colorCount;
+    for (uint32_t i = 0; i < formats.colorCount; ++i)
+        psoDesc.RTVFormats[i] = formats.colors[i];
+    psoDesc.DSVFormat        = formats.depth;
+    psoDesc.SampleDesc.Count = 1;
+    psoDesc.SampleMask       = UINT_MAX;
 
     Microsoft::WRL::ComPtr<ID3D12PipelineState> pso;
     HRESULT hr = _driver->getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pso));

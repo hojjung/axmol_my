@@ -599,10 +599,10 @@ void RenderContextImpl::beginRenderPass(RenderTarget* renderTarget, const Render
 
     _currentRT = renderTarget;
 
-    // Cache target size from first color attachment
-    auto colorAttachment = rtImpl->getColorAttachment(0);
-    _renderTargetWidth   = colorAttachment->getDesc().width;
-    _renderTargetHeight  = colorAttachment->getDesc().height;
+    _renderTargetWidth  = static_cast<uint32_t>(rtImpl->getWidth());
+    _renderTargetHeight = static_cast<uint32_t>(rtImpl->getHeight());
+    AXASSERT(_renderTargetWidth > 0 && _renderTargetHeight > 0,
+             "Render pass requires a valid color or depth attachment");
 
     // Delegate to RenderTargetImplVK: it will select/create VkRenderPass and VkFramebuffer
     rtImpl->beginRenderPass(_currentCmdBuffer, renderPassDesc, _renderTargetWidth, _renderTargetHeight, _imageIndex);

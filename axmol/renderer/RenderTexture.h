@@ -111,6 +111,17 @@ public:
                                           rhi::PixelFormat depthStencilFormat = rhi::PixelFormat::NONE);
 
     /**
+     * @brief Creates a sampleable depth-only render texture.
+     *
+     * The returned texture owns no color attachment. getDepthTexture() returns
+     * a D24S8 Texture2D configured for nearest comparison sampling with
+     * CompareFunc::LESS_EQUAL.
+     */
+    static RenderTexture* createDepthOnly(int w, int h, rhi::PixelFormat depthStencilFormat = rhi::PixelFormat::D24S8);
+    static RenderTexture* createDepthOnly(const Vec2& size,
+                                          rhi::PixelFormat depthStencilFormat = rhi::PixelFormat::D24S8);
+
+    /**
      * @brief Returns the underlying render target used for offscreen rendering.
      */
     rhi::RenderTarget* getRenderTarget() const { return _renderTarget; }
@@ -119,6 +130,12 @@ public:
      * @brief Returns the optional depth/stencil texture attached to this render texture.
      */
     Texture2D* getDepthStencilTexture() const { return _depthStencilTexture; }
+
+    /** Returns the sampleable depth attachment. */
+    Texture2D* getDepthTexture() const { return _depthStencilTexture; }
+
+    /** Returns whether this render texture owns a color attachment. */
+    bool hasColorAttachment() const { return _rhiTexture != nullptr; }
 
     /**
      * @brief Returns the depth/stencil attachment format.

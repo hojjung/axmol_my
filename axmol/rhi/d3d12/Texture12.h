@@ -131,7 +131,7 @@ public:
 private:
     D3D12_RESOURCE_STATES ensureNativeTexture(bool prepareForCopyDest,
                                               std::optional<Color> clearColorHint = std::nullopt);
-    void createShaderResourceView(const dxutils::PixelFormatInfo* fmtInfo,
+    void createShaderResourceView(DXGI_FORMAT srvFormat,
                                   uint32_t mipLevels,
                                   uint32_t arrayLayers,
                                   bool isCube,

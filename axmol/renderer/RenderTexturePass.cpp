@@ -74,13 +74,15 @@ void RenderTexturePass::updateViewport()
         return;
     }
 
-    auto colorBuffer = _renderTarget->_color[0];
-    if (!colorBuffer)
+    const int width  = _renderTarget->getWidth();
+    const int height = _renderTarget->getHeight();
+    if (width <= 0 || height <= 0)
     {
         AXASSERT(!_active, "Cannot change target while pass is active");
+        _viewport.reset();
         return;
     }
-    _viewport.emplace(0, 0, colorBuffer.texture->getWidth(), colorBuffer.texture->getHeight());
+    _viewport.emplace(0, 0, width, height);
 }
 
 void RenderTexturePass::setViewport(std::optional<Viewport> vp)

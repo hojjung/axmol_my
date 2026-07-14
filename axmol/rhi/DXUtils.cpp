@@ -115,6 +115,22 @@ const PixelFormatInfo* toDxgiFormatInfo(PixelFormat pf)
     return nullptr;
 }
 
+DXGI_FORMAT selectTextureResourceFormat(const PixelFormatInfo& formatInfo, const TextureDesc& desc)
+{
+    return desc.textureUsage == TextureUsage::READ && desc.colorSpace == ColorSpace::Srgb &&
+                   formatInfo.fmtSrgb != DXGI_FORMAT_UNKNOWN
+               ? formatInfo.fmtSrgb
+               : formatInfo.format;
+}
+
+DXGI_FORMAT selectTextureSrvFormat(const PixelFormatInfo& formatInfo, const TextureDesc& desc)
+{
+    return desc.textureUsage == TextureUsage::READ && desc.colorSpace == ColorSpace::Srgb &&
+                   formatInfo.fmtSrgb != DXGI_FORMAT_UNKNOWN
+               ? formatInfo.fmtSrgb
+               : formatInfo.fmtSrv;
+}
+
 int evalulateMaxTexSize(D3D_FEATURE_LEVEL fl)
 {
     switch (fl)

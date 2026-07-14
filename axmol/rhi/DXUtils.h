@@ -46,6 +46,9 @@ struct PixelFormatInfo
 
 const PixelFormatInfo* toDxgiFormatInfo(PixelFormat pf);
 
+DXGI_FORMAT selectTextureResourceFormat(const PixelFormatInfo& formatInfo, const TextureDesc& desc);
+DXGI_FORMAT selectTextureSrvFormat(const PixelFormatInfo& formatInfo, const TextureDesc& desc);
+
 int evalulateMaxTexSize(D3D_FEATURE_LEVEL fl);
 
 DXGI_FORMAT getUAVCompatibleFormat(DXGI_FORMAT format);

@@ -426,7 +426,7 @@ void RenderContextImpl::readPixels(RenderTarget* rt, std::function<void(const Pi
     else
     {
         // we only readPixels from the COLOR0 attachment.
-        auto colorAttachment = rt->_color[0].texture;
+        auto colorAttachment = !rt->_color.empty() ? rt->_color[0].texture : nullptr;
         if (colorAttachment)
         {
             readPixels(rt, 0, 0, colorAttachment->getWidth(), colorAttachment->getHeight(),

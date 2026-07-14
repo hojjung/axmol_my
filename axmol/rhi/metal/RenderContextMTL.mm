@@ -262,8 +262,8 @@ void RenderContextImpl::beginRenderPass(RenderTarget* renderTarget, const Render
     auto rtMTL                       = static_cast<RenderTargetImpl*>(_currentRT);
     rtMTL->applyRenderPassAttachments(renderPassDesc, mtlDesc);
 
-    _renderTargetWidth  = (unsigned int)mtlDesc.colorAttachments[0].texture.width;
-    _renderTargetHeight = (unsigned int)mtlDesc.colorAttachments[0].texture.height;
+    _renderTargetWidth  = static_cast<unsigned int>(renderTarget->getWidth());
+    _renderTargetHeight = static_cast<unsigned int>(renderTarget->getHeight());
     _mtlRenderEncoder   = [_currentCmdBuffer renderCommandEncoderWithDescriptor:mtlDesc];
     [_mtlRenderEncoder retain];
     //    [_mtlRenderEncoder setFrontFacingWinding:MTLWindingCounterClockwise];
@@ -379,9 +379,15 @@ void RenderContextImpl::readPixels(RenderTarget* rt, std::function<void(const Pi
 {
     auto rtMTL = static_cast<RenderTargetImpl*>(rt);
 
-    // we only read form color attachment 0
-    // if it's nullptr, will regard as screen to perform capture
-    auto texture = rtMTL->_color[0].texture;
+    // A null texture is the screen-capture sentinel. Do not misclassify a
+    // depth-only offscreen target as the screen.
+    if (!rtMTL->isDefaultRenderTarget() && (rtMTL->_color.empty() || rtMTL->_color[0].texture == nullptr))
+    {
+        callback({});
+        return;
+    }
+
+    auto texture = rtMTL->isDefaultRenderTarget() ? nullptr : rtMTL->_color[0].texture;
     AX_SAFE_RETAIN(texture);
     _captureCallbacks.emplace_back(texture, std::move(callback));
 }

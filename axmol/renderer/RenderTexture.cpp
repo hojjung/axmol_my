@@ -58,8 +58,10 @@ RenderTexture::RenderTexture()
     });
     _director->getEventDispatcher()->addEventListenerWithFixedPriority(_backgroundListener, -1);
 
-    _foregroundListener =
-        CustomEventListener::create(EVENT_COME_TO_FOREGROUND, [this](CustomEvent*) { setAntiAliasTexParameters(); });
+    _foregroundListener = CustomEventListener::create(EVENT_COME_TO_FOREGROUND, [this](CustomEvent*) {
+        if (_rhiTexture)
+            setAntiAliasTexParameters();
+    });
     _director->getEventDispatcher()->addEventListenerWithFixedPriority(_foregroundListener, -1);
 #endif
 }
@@ -103,6 +105,23 @@ RenderTexture* RenderTexture::createForCanvas(const Vec2& contentSize,
     return RenderTexture::create(Director::getInstance()->canvasToPixels(contentSize), format, depthStencilFormat);
 }
 
+RenderTexture* RenderTexture::createDepthOnly(int w, int h, rhi::PixelFormat depthStencilFormat)
+{
+    RenderTexture* ret = new RenderTexture();
+    if (ret->initWithWidthAndHeight(w, h, rhi::PixelFormat::NONE, depthStencilFormat))
+    {
+        ret->autorelease();
+        return ret;
+    }
+    AX_SAFE_DELETE(ret);
+    return nullptr;
+}
+
+RenderTexture* RenderTexture::createDepthOnly(const Vec2& size, rhi::PixelFormat depthStencilFormat)
+{
+    return createDepthOnly(static_cast<int>(size.width), static_cast<int>(size.height), depthStencilFormat);
+}
+
 bool RenderTexture::initWithWidthAndHeight(int w, int h, rhi::PixelFormat format, rhi::PixelFormat depthStencilFormat)
 {
     return initWithWidthAndHeightInternal(w, h, format, depthStencilFormat, std::nullopt);
@@ -123,8 +142,19 @@ bool RenderTexture::initWithWidthAndHeightInternal(int w,
                                                    rhi::PixelFormat depthStencilFormat,
                                                    std::optional<Color> clearColorHint)
 {
-    AXASSERT(format == rhi::PixelFormat::RGBA8 || format == PixelFormat::RGB8 || format == PixelFormat::RGBA4,
-             "only RGB and RGBA formats are valid for a render texture");
+    const bool depthOnly = format == rhi::PixelFormat::NONE;
+    AXASSERT(
+        format == rhi::PixelFormat::RGBA8 || format == PixelFormat::RGB8 || format == PixelFormat::RGBA4 || depthOnly,
+        "only RGB, RGBA, or NONE formats are valid for a render texture");
+    AXASSERT(!depthOnly || depthStencilFormat == rhi::PixelFormat::D24S8,
+             "a depth-only render texture requires a D24S8 attachment");
+    if (w <= 0 || h <= 0 || (depthOnly && depthStencilFormat != rhi::PixelFormat::D24S8))
+        return false;
+    if (depthOnly && !axdrv->checkForFeatureSupported(rhi::FeatureType::DEPTH_COMPARISON_SAMPLING))
+    {
+        AXLOGE("D24S8 depth rendering with comparison sampling is not supported by the active RHI");
+        return false;
+    }
 
     _depthStencilFormat = depthStencilFormat;
 
@@ -134,10 +164,13 @@ bool RenderTexture::initWithWidthAndHeightInternal(int w,
     desc.textureUsage = TextureUsage::RENDER_TARGET;
     desc.pixelFormat  = format;
 
-    const Color initialClearColor = clearColorHint.value_or(Color(0, 0, 0, 0));
-    if (!initWithSpec(desc, Texture2D::DEFAULT_SLICE_DATA, rhi::PixelFormat::NONE, !!AX_ENABLE_PREMULTIPLIED_ALPHA,
-                      initialClearColor))
-        return false;
+    if (!depthOnly)
+    {
+        const Color initialClearColor = clearColorHint.value_or(Color(0, 0, 0, 0));
+        if (!initWithSpec(desc, Texture2D::DEFAULT_SLICE_DATA, rhi::PixelFormat::NONE, !!AX_ENABLE_PREMULTIPLIED_ALPHA,
+                          initialClearColor))
+            return false;
+    }
 
     _width  = w;
     _height = h;
@@ -154,20 +187,35 @@ bool RenderTexture::initWithWidthAndHeightInternal(int w,
             AX_SAFE_RELEASE(_depthStencilTexture);
             return false;
         }
+
+        if (depthOnly)
+        {
+            rhi::SamplerDesc shadowSampler;
+            shadowSampler.minFilter    = rhi::SamplerFilter::MIN_NEAREST;
+            shadowSampler.magFilter    = rhi::SamplerFilter::MAG_NEAREST;
+            shadowSampler.mipFilter    = rhi::SamplerFilter::MIP_DEFAULT;
+            shadowSampler.sAddressMode = rhi::SamplerAddressMode::CLAMP;
+            shadowSampler.tAddressMode = rhi::SamplerAddressMode::CLAMP;
+            shadowSampler.wAddressMode = rhi::SamplerAddressMode::CLAMP;
+            shadowSampler.compareFunc  = rhi::CompareFunc::LESS_EQUAL;
+            _depthStencilTexture->setTexParameters(shadowSampler);
+        }
     }
 
     // Create render target
     _renderTarget =
         axdrv->createRenderTarget(_rhiTexture, _depthStencilTexture ? _depthStencilTexture->getRHITexture() : nullptr);
-    _renderTarget->setColorTexture(_rhiTexture);
+    if (_rhiTexture)
+        _renderTarget->setColorTexture(_rhiTexture);
 
     if (_depthStencilTexture)
         _renderTarget->setDepthStencilTexture(_depthStencilTexture->getRHITexture());
 
-    setAntiAliasTexParameters();
+    if (_rhiTexture)
+        setAntiAliasTexParameters();
 
 #if AX_ENABLE_CONTEXT_LOSS_RECOVERY
-    _cachedTextureDirty = true;
+    _cachedTextureDirty = _rhiTexture != nullptr;
 
     if (!_rendererRecreatedListener)
     {
@@ -201,6 +249,12 @@ bool RenderTexture::initWithWidthAndHeightInternal(int w,
 
 void RenderTexture::newImage(std::function<void(RefPtr<Image>)> imageCallback)
 {
+    if (!_rhiTexture)
+    {
+        imageCallback(nullptr);
+        return;
+    }
+
     AXASSERT(_originalPF == rhi::PixelFormat::RGBA8, "only RGBA8888 can be saved as image");
 
     if (!_renderTarget)

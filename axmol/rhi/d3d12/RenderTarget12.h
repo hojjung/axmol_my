@@ -62,6 +62,7 @@ public:
 
     Attachment getColorAttachment(int index) const;
     Attachment getDepthStencilAttachment() const;
+    uint32_t getColorAttachmentCount() const { return _numRTVs; }
 
     bool rebuildSwapchainBuffers(IDXGISwapChain4* swapchain,
                                  uint32_t width,

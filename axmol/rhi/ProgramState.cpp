@@ -253,6 +253,15 @@ void ProgramState::setUniform(const rhi::UniformLocation& uniformLocation, const
     }
 }
 
+bool ProgramState::restoreUniformBuffer(const void* data, size_t size) noexcept
+{
+    if (!data || size != _uniformBuffer.size())
+        return false;
+
+    memcpy(_uniformBuffer.data(), data, size);
+    return true;
+}
+
 void ProgramState::setTexture(rhi::Texture* texture)
 {
     auto location = getUniformLocation(rhi::Uniform::TEXTURE);

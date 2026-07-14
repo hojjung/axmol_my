@@ -69,12 +69,18 @@ TextureImpl::TextureImpl(id<MTLDevice> mtlDevice, id<MTLTexture> texture)
     switch (texture.pixelFormat)
     {
     case MTLPixelFormatRGBA8Unorm:
-    case MTLPixelFormatRGBA8Unorm_sRGB:
         _desc.pixelFormat = PixelFormat::RGBA8;
         break;
+    case MTLPixelFormatRGBA8Unorm_sRGB:
+        _desc.pixelFormat = PixelFormat::RGBA8;
+        _desc.colorSpace  = ColorSpace::Srgb;
+        break;
     case MTLPixelFormatBGRA8Unorm:
+        _desc.pixelFormat = PixelFormat::BGRA8;
+        break;
     case MTLPixelFormatBGRA8Unorm_sRGB:
         _desc.pixelFormat = PixelFormat::BGRA8;
+        _desc.colorSpace  = ColorSpace::Srgb;
         break;
     case MTLPixelFormatR8Unorm:
         _desc.pixelFormat = PixelFormat::R8;
@@ -202,7 +208,7 @@ void TextureImpl::ensureNativeTexture()
 {
     if (_mtlTexture)
         return;
-    MTLPixelFormat pixelFormat = UtilsMTL::toMTLPixelFormat(_desc.pixelFormat);
+    MTLPixelFormat pixelFormat = UtilsMTL::toMTLPixelFormat(_desc);
     if (pixelFormat == MTLPixelFormatInvalid)
         return;
 

@@ -415,34 +415,40 @@ IUnknown* DriverImpl::compileShader(std::span<uint8_t> shaderCode, ShaderStage s
 
 SamplerHandle DriverImpl::createSampler(const SamplerDesc& desc)
 {
+    static constexpr D3D11_FILTER kFilterTable[8]           = {D3D11_FILTER_MIN_MAG_MIP_POINT,
+                                                               D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR,
+                                                               D3D11_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT,
+                                                               D3D11_FILTER_MIN_POINT_MAG_MIP_LINEAR,
+                                                               D3D11_FILTER_MIN_LINEAR_MAG_MIP_POINT,
+                                                               D3D11_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR,
+                                                               D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT,
+                                                               D3D11_FILTER_MIN_MAG_MIP_LINEAR};
+    static constexpr D3D11_FILTER kComparisonFilterTable[8] = {D3D11_FILTER_COMPARISON_MIN_MAG_MIP_POINT,
+                                                               D3D11_FILTER_COMPARISON_MIN_MAG_POINT_MIP_LINEAR,
+                                                               D3D11_FILTER_COMPARISON_MIN_POINT_MAG_LINEAR_MIP_POINT,
+                                                               D3D11_FILTER_COMPARISON_MIN_POINT_MAG_MIP_LINEAR,
+                                                               D3D11_FILTER_COMPARISON_MIN_LINEAR_MAG_MIP_POINT,
+                                                               D3D11_FILTER_COMPARISON_MIN_LINEAR_MAG_POINT_MIP_LINEAR,
+                                                               D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT,
+                                                               D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR};
+
     D3D11_SAMPLER_DESC sd = {};
 
     // --- Filter ---
     if (desc.minFilter == SamplerFilter::MIN_ANISOTROPIC)
     {
-        sd.Filter        = D3D11_FILTER_ANISOTROPIC;
+        sd.Filter =
+            desc.compareFunc == CompareFunc::NEVER ? D3D11_FILTER_ANISOTROPIC : D3D11_FILTER_COMPARISON_ANISOTROPIC;
         sd.MaxAnisotropy = std::clamp(desc.anisotropy + 1u, 1u, 16u);
     }
     else
     {
         const auto minL = ((int)desc.minFilter & (int)SamplerFilter::MIN_LINEAR);
         const auto magL = ((int)desc.magFilter & (int)SamplerFilter::MAG_LINEAR);
-        const auto mipL = ((int)desc.mipFilter & (int)SamplerFilter::MIP_LINEAR);
-
-        // minL<<2 | magL<<1 | mipL
-        static const D3D11_FILTER filterTable[8] = {
-            D3D11_FILTER_MIN_MAG_MIP_POINT,                // 000
-            D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR,         // 001
-            D3D11_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT,   // 010
-            D3D11_FILTER_MIN_POINT_MAG_MIP_LINEAR,         // 011
-            D3D11_FILTER_MIN_LINEAR_MAG_MIP_POINT,         // 100
-            D3D11_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR,  // 101
-            D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT,         // 110
-            D3D11_FILTER_MIN_MAG_MIP_LINEAR                // 111
-        };
+        const bool mipL = desc.mipFilter == SamplerFilter::MIP_LINEAR;
 
         const int idx = (minL << 2) | (magL << 1) | (mipL ? 1 : 0);
-        sd.Filter     = filterTable[idx];
+        sd.Filter     = desc.compareFunc == CompareFunc::NEVER ? kFilterTable[idx] : kComparisonFilterTable[idx];
 
         sd.MaxAnisotropy = 1;
     }
@@ -462,7 +468,7 @@ SamplerHandle DriverImpl::createSampler(const SamplerDesc& desc)
     sd.ComparisonFunc = static_cast<D3D11_COMPARISON_FUNC>(D3D11_COMPARISON_NEVER + static_cast<int>(desc.compareFunc));
 
     sd.MinLOD = 0;
-    sd.MaxLOD = D3D11_FLOAT32_MAX;
+    sd.MaxLOD = desc.mipFilter == SamplerFilter::MIP_DEFAULT ? 0.0f : D3D11_FLOAT32_MAX;
 
     ID3D11SamplerState* sampler{nullptr};
     _device->CreateSamplerState(&sd, &sampler);
@@ -568,6 +574,21 @@ bool DriverImpl::checkForFeatureSupported(FeatureType feature)
     case FeatureType::ASTC:
 #define DXGI_FORMAT_ASTC_4X4_UNORM DXGI_FORMAT(134)
         return checkFormatSupport(DXGI_FORMAT_ASTC_4X4_UNORM);
+    case FeatureType::DEPTH_COMPARISON_SAMPLING:
+    {
+        UINT resourceSupport = 0;
+        UINT dsvSupport      = 0;
+        UINT srvSupport      = 0;
+        if (FAILED(_device->CheckFormatSupport(DXGI_FORMAT_R24G8_TYPELESS, &resourceSupport)) ||
+            FAILED(_device->CheckFormatSupport(DXGI_FORMAT_D24_UNORM_S8_UINT, &dsvSupport)) ||
+            FAILED(_device->CheckFormatSupport(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, &srvSupport)))
+            return false;
+
+        return (resourceSupport & D3D11_FORMAT_SUPPORT_TEXTURE2D) != 0 &&
+               (dsvSupport & D3D11_FORMAT_SUPPORT_DEPTH_STENCIL) != 0 &&
+               (srvSupport & D3D11_FORMAT_SUPPORT_SHADER_SAMPLE) != 0 &&
+               (srvSupport & D3D11_FORMAT_SUPPORT_SHADER_SAMPLE_COMPARISON) != 0;
+    }
     }
     return false;
 }

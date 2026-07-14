@@ -288,7 +288,7 @@ void TextureImpl::ensureNativeTexture()
         return;
     }
 
-    texDesc.Format = fmtInfo->format;
+    texDesc.Format = dxutils::selectTextureResourceFormat(*fmtInfo, _desc);
 
     ComPtr<ID3D11Texture2D> texture;
     HRESULT hr = _device->CreateTexture2D(&texDesc, nullptr, texture.GetAddressOf());
@@ -298,7 +298,7 @@ void TextureImpl::ensureNativeTexture()
     }
 
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-    srvDesc.Format = fmtInfo->fmtSrv;
+    srvDesc.Format = dxutils::selectTextureSrvFormat(*fmtInfo, _desc);
 
     // srvDesc.xxx.MipLevels:
     //   Set to -1 to indicate all the mipmap levels from MostDetailedMip on down to least detailed.

@@ -36,6 +36,9 @@ namespace ax::rhi::vk
 RenderTargetImpl::RenderTargetImpl(DriverImpl* driver, bool defaultRenderTarget)
     : RenderTarget(defaultRenderTarget), _driver(driver)
 {
+    // Keep a dedicated trailing slot for the depth/stencil image view even
+    // before a color attachment is assigned.
+    _attachmentViews.resize(1);
     _clearValues.reserve(_color.size() + 1);
 }
 
@@ -71,8 +74,10 @@ void RenderTargetImpl::cleanupResources()
 
 void RenderTargetImpl::setColorTexture(Texture* texture, int level, int index)
 {
+    const auto depthView = _attachmentViews.empty() ? VK_NULL_HANDLE : _attachmentViews.back();
     RenderTarget::setColorTexture(texture, level, index);
     _attachmentViews.resize(_color.size() + 1);
+    _attachmentViews.back() = depthView;
 }
 
 void RenderTargetImpl::rebuildSwapchainAttachments(const tlx::pod_vector<VkImage>& images,
@@ -239,9 +244,9 @@ void RenderTargetImpl::beginRenderPass(VkCommandBuffer cmd,
                 }
             }
 
-            _activeHashSeed = tlx::hash64_bytes(&_attachmentViews[0], sizeof(_attachmentViews));
+            _activeHashSeed = tlx::hash64_bytes(_attachmentViews.data(), _attachmentViews.size() * sizeof(VkImageView));
 
-            _numMRT = static_cast<uint32_t>(_color.size());
+            _numMRT = getActiveColorAttachmentCount();
 
             _dirtyFlags = TargetBufferFlags::NONE;
         }
@@ -343,8 +348,15 @@ void RenderTargetImpl::endRenderPass(VkCommandBuffer cmd)
         }
         if (_depthStencil)
         {
-            auto texImpl = static_cast<TextureImpl*>(_depthStencil.texture);
-            texImpl->setKnownLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+            auto texImpl           = static_cast<TextureImpl*>(_depthStencil.texture);
+            const auto finalLayout = texImpl->getRenderTargetFinalLayout();
+            if (finalLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            {
+                AXASSERT(texImpl->canUseShaderReadOnlyLayout(),
+                         "VkImage must have VK_IMAGE_USAGE_SAMPLED_BIT before using "
+                         "VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL");
+            }
+            texImpl->transitionLayout(cmd, finalLayout);
         }
     }
 }
@@ -382,17 +394,9 @@ void RenderTargetImpl::updateFramebuffer(VkCommandBuffer /*cmd*/, uint32_t image
         if (_attachmentViews.back() != VK_NULL_HANDLE)
             views.push_back(_attachmentViews.back());
 
-        // Derive framebuffer extent from color0 or depth if color0 absent (depth-only)
-        const auto color0 = getColorAttachment(0);
-        auto& colorDesc   = color0->getDesc();
-        uint32_t fbWidth  = colorDesc.width;
-        uint32_t fbHeight = colorDesc.height;
-        if ((fbWidth == 0 || fbHeight == 0) && _attachmentViews.back() != VK_NULL_HANDLE)
-        {
-            const auto& dsDesc = getDepthStencilAttachment()->getDesc();
-            fbWidth            = dsDesc.width;
-            fbHeight           = dsDesc.height;
-        }
+        const auto fbWidth  = static_cast<uint32_t>(getWidth());
+        const auto fbHeight = static_cast<uint32_t>(getHeight());
+        AXASSERT(fbWidth > 0 && fbHeight > 0, "Framebuffer requires a valid color or depth attachment");
 
         VkFramebufferCreateInfo fbci{};
         fbci.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -547,11 +551,14 @@ void RenderTargetImpl::updateRenderPass(const RenderPassDesc& desc, uint32_t ima
         uint32_t depCount = 1;
         if (hasDepth)
         {
-            deps[1].srcSubpass    = VK_SUBPASS_EXTERNAL;
-            deps[1].dstSubpass    = 0;
-            deps[1].srcStageMask  = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-            deps[1].dstStageMask  = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-            deps[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            deps[1].srcSubpass = VK_SUBPASS_EXTERNAL;
+            deps[1].dstSubpass = 0;
+            deps[1].srcStageMask =
+                VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            deps[1].dstStageMask =
+                VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            deps[1].srcAccessMask =
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
             deps[1].dstAccessMask =
                 VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
             depCount = 2;
@@ -595,7 +602,8 @@ void RenderTargetImpl::prepareAttachmentsForRendering(VkCommandBuffer cmd)
 
 RenderTargetImpl::Attachment RenderTargetImpl::getColorAttachment(int index) const
 {
-    return static_cast<TextureImpl*>(_color[index].texture);
+    return index >= 0 && static_cast<size_t>(index) < _color.size() ? static_cast<TextureImpl*>(_color[index].texture)
+                                                                    : nullptr;
 }
 
 RenderTargetImpl::Attachment RenderTargetImpl::getDepthStencilAttachment() const

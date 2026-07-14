@@ -197,6 +197,9 @@ bool RenderTargetImpl::rebuildSwapchainBuffers(IDXGISwapChain* swapchain,
 
 RenderTargetImpl::Attachment RenderTargetImpl::getColorAttachment(int index) const
 {
+    if (index < 0 || static_cast<size_t>(index) >= _color.size())
+        return {};
+
     auto textureImpl = static_cast<TextureImpl*>(_defaultRenderTarget ? _color[0].texture : _color[index].texture);
     return textureImpl
                ? RenderTargetImpl::Attachment{static_cast<ID3D11Texture2D*>(textureImpl->internalHandle().resource),

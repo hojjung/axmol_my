@@ -212,10 +212,10 @@ void SamplerCache::createBuiltinSamplers()
     // --- Depth comparison samplers ---
     {
         SamplerDesc d{};
-        d.minFilter   = SamplerFilter::MIN_LINEAR;
-        d.magFilter   = SamplerFilter::MAG_LINEAR;
+        d.minFilter   = SamplerFilter::MIN_NEAREST;
+        d.magFilter   = SamplerFilter::MAG_NEAREST;
         d.mipFilter   = SamplerFilter::MIP_DEFAULT;
-        d.compareFunc = CompareFunc::LESS;
+        d.compareFunc = CompareFunc::LESS_EQUAL;
 
         d.sAddressMode = SamplerAddressMode::CLAMP;
         createBuiltinSampler(SamplerIndex::ShadowCmpClamp, d);

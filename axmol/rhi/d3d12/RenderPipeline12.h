@@ -35,6 +35,7 @@ class DepthStencilStateImpl;
 class VertexLayoutImpl;
 class ProgramImpl;
 class DriverImpl;
+class RenderTargetImpl;
 
 struct RootSignatureEntry
 {
@@ -88,7 +89,7 @@ private:
 
     void updateBlendState(const BlendDesc& blendDesc);
     void updateRootSignature(ProgramImpl* program);
-    void updateGraphicsPipeline(const PipelineDesc& desc, ProgramImpl* program);
+    void updateGraphicsPipeline(const RenderTargetImpl* renderTarget, const PipelineDesc& desc, ProgramImpl* program);
 
 private:
     DriverImpl* _driver{nullptr};

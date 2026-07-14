@@ -65,13 +65,9 @@ static inline bool isBlockAligned(uint32_t x, uint32_t y, uint32_t blockW, uint3
     return (x % blockW == 0) && (y % blockH == 0);
 }
 
-static VkImageLayout getDefaultRenderTargetFinalLayout(const TextureDesc& desc)
+static VkImageLayout getDefaultRenderTargetFinalLayout(const TextureDesc&)
 {
-    if (desc.textureUsage != TextureUsage::RENDER_TARGET)
-        return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-    return desc.pixelFormat == PixelFormat::D24S8 ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-                                                  : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 }
 
 // Transition an image subresource range between layouts (auto src/dst inference)
@@ -115,8 +111,9 @@ static void transitionImageLayout(VkCommandBuffer cmd,
         srcStage              = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         break;
     case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-        barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        srcStage              = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        barrier.srcAccessMask =
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        srcStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
         break;
     default:
         barrier.srcAccessMask = 0;
@@ -143,8 +140,9 @@ static void transitionImageLayout(VkCommandBuffer cmd,
         dstStage              = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         break;
     case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-        barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        dstStage              = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        barrier.dstAccessMask =
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        dstStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
         break;
     default:
         barrier.dstAccessMask = 0;
@@ -224,9 +222,12 @@ TextureImpl::TextureImpl(DriverImpl* driver,
         viewInfo.format     = UtilsVK::toVkFormat(desc.pixelFormat, desc.colorSpace == ColorSpace::Srgb);
         viewInfo.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B,
                                VK_COMPONENT_SWIZZLE_A};
-        viewInfo.subresourceRange.aspectMask     = desc.pixelFormat == PixelFormat::D24S8
-                                                       ? (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)
-                                                       : VK_IMAGE_ASPECT_COLOR_BIT;
+        // A depth image view used by a combined image sampler must select
+        // exactly one aspect. The same depth-only view is valid as a
+        // depth/stencil framebuffer attachment; Vulkan ignores the view's
+        // aspect mask for that attachment use.
+        viewInfo.subresourceRange.aspectMask =
+            desc.pixelFormat == PixelFormat::D24S8 ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
         viewInfo.subresourceRange.baseMipLevel   = 0;
         viewInfo.subresourceRange.levelCount     = desc.mipLevels;
         viewInfo.subresourceRange.baseArrayLayer = 0;
@@ -682,7 +683,7 @@ void TextureImpl::ensureNativeTexture()
         else
         {
             imageInfo.usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-            _rtFinalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            _rtFinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         }
 
         // Optional: if future plan to use as input attachment in subpasses
@@ -738,12 +739,11 @@ void TextureImpl::ensureNativeTexture()
         viewInfo.viewType = (_desc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D);
     }
 
-    viewInfo.format                          = vkFmt;
-    viewInfo.components                      = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B,
-                                                VK_COMPONENT_SWIZZLE_A};
-    viewInfo.subresourceRange.aspectMask     = (_desc.pixelFormat == PixelFormat::D24S8)
-                                                   ? (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)
-                                                   : VK_IMAGE_ASPECT_COLOR_BIT;
+    viewInfo.format     = vkFmt;
+    viewInfo.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B,
+                           VK_COMPONENT_SWIZZLE_A};
+    viewInfo.subresourceRange.aspectMask =
+        (_desc.pixelFormat == PixelFormat::D24S8) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
     viewInfo.subresourceRange.baseMipLevel   = 0;
     viewInfo.subresourceRange.levelCount     = mipLevels;
     viewInfo.subresourceRange.baseArrayLayer = 0;

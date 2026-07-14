@@ -632,7 +632,7 @@ SamplerHandle DriverImpl::createSampler(const SamplerDesc& desc)
     {
         const auto minL = ((int)desc.minFilter & (int)SamplerFilter::MIN_LINEAR);
         const auto magL = ((int)desc.magFilter & (int)SamplerFilter::MAG_LINEAR);
-        const auto mipL = ((int)desc.mipFilter & (int)SamplerFilter::MIP_LINEAR);
+        const bool mipL = desc.mipFilter == SamplerFilter::MIP_LINEAR;
 
         const int idx = (minL << 2) | (magL << 1) | (mipL ? 1 : 0);
 
@@ -653,7 +653,7 @@ SamplerHandle DriverImpl::createSampler(const SamplerDesc& desc)
     sd.ComparisonFunc = kCompareFunTbl[(UINT)desc.compareFunc];
 
     sd.MinLOD         = 0.0f;
-    sd.MaxLOD         = D3D12_FLOAT32_MAX;
+    sd.MaxLOD         = desc.mipFilter == SamplerFilter::MIP_DEFAULT ? 0.0f : D3D12_FLOAT32_MAX;
     sd.MipLODBias     = 0.0f;
     sd.BorderColor[0] = sd.BorderColor[1] = sd.BorderColor[2] = sd.BorderColor[3] = 0.0f;
 
@@ -1287,6 +1287,19 @@ bool DriverImpl::checkForFeatureSupported(FeatureType feature)
     case FeatureType::ASTC:
 #define DXGI_FORMAT_ASTC_4X4_UNORM DXGI_FORMAT(134)
         return checkFormatSupport(DXGI_FORMAT_ASTC_4X4_UNORM);
+    case FeatureType::DEPTH_COMPARISON_SAMPLING:
+    {
+        auto querySupport = [this](DXGI_FORMAT format, UINT required) {
+            D3D12_FEATURE_DATA_FORMAT_SUPPORT support{format};
+            return SUCCEEDED(_device->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &support, sizeof(support))) &&
+                   (support.Support1 & required) == required;
+        };
+
+        return querySupport(DXGI_FORMAT_R24G8_TYPELESS, D3D12_FORMAT_SUPPORT1_TEXTURE2D) &&
+               querySupport(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_FORMAT_SUPPORT1_DEPTH_STENCIL) &&
+               querySupport(DXGI_FORMAT_R24_UNORM_X8_TYPELESS,
+                            D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE | D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE_COMPARISON);
+    }
     }
     return false;
 }

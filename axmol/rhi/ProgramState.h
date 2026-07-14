@@ -228,6 +228,9 @@ public:
 
     const tlx::byte_buffer& getUniformBuffer() const { return _uniformBuffer; }
 
+    /** Restores a command-local copy of the complete CPU uniform buffer. */
+    bool restoreUniformBuffer(const void* data, size_t size) noexcept;
+
     /**
      * An abstract base class that can be extended to support custom material auto bindings.
      *

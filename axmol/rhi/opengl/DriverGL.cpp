@@ -683,6 +683,11 @@ bool DriverImpl::checkForFeatureSupported(FeatureType feature)
     case FeatureType::VERTEX_ATTRIB_BINDING:
         featureSupported = _cap.vertexAttribBinding;
         break;
+    case FeatureType::DEPTH_COMPARISON_SAMPLING:
+        // Desktop GL 3.3 and GLES 3.0/WebGL 2 expose depth-stencil textures,
+        // sampler2DShadow, and texture comparison state in core.
+        featureSupported = _verInfo.major >= 3;
+        break;
     default:
         break;
     }

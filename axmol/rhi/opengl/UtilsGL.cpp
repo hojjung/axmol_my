@@ -85,14 +85,14 @@ static GPUTextureFormatInfo s_textureFormats[] =
     { GL_COMPRESSED_RGBA_ASTC_12x12_KHR,           GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR,    GL_COMPRESSED_RGBA_ASTC_12x12_KHR,           GL_COMPRESSED_RGBA_ASTC_12x12_KHR,           GL_ZERO, }, // ASTC12x12
 
     /* nomral */
-    { GL_RGBA,                                     GL_SRGB_ALPHA,                                GL_RGBA,                                     GL_RGBA,                                     GL_UNSIGNED_BYTE, }, // RGBA8
-    { GL_BGRA,                                     GL_BGRA,                                      GL_BGRA,                                     GL_BGRA,                                     GL_UNSIGNED_BYTE, }, // BGRA8
-    { GL_RGB,                                      GL_SRGB,                                      GL_RGB,                                      GL_RGB,                                      GL_UNSIGNED_BYTE, }, // RGB8
-    { GL_RGB,                                      GL_SRGB,                                      GL_RGB,                                      GL_RGB,                                      GL_UNSIGNED_SHORT_5_6_5}, // RGB565 === MTLPixelFormatB5G6R5Unorm
-    { GL_RGBA,                                     GL_SRGB_ALPHA,                                GL_RGBA,                                     GL_RGBA,                                     GL_UNSIGNED_SHORT_4_4_4_4}, // RGBA4 === MTLPixelFormatABGR4Unorm
-    { GL_RGBA,                                     GL_SRGB_ALPHA,                                GL_RGBA,                                     GL_RGBA,                                     GL_UNSIGNED_SHORT_5_5_5_1}, // RGB5A1 === MTLPixelFormatA1BGR5Unorm
-    { GL_R8,                                       GL_R8,                                        GL_RED,                                      GL_RED,                                      GL_UNSIGNED_BYTE, }, // R8 In Shader: (R,0,0,0) GL3/GLES3 preferred
-    { GL_RG8,                                      GL_RG,                                        GL_RG,                                       GL_RG,                                       GL_UNSIGNED_BYTE, }, // RG8 In Shader: (R,G,0,0) GL3/GLES3 preferred
+    { GL_RGBA,                                     GL_SRGB8_ALPHA8,                              GL_RGBA,                                     GL_RGBA,                                     GL_UNSIGNED_BYTE, }, // RGBA8
+    { GL_BGRA,                                     GL_SRGB8_ALPHA8,                              GL_BGRA,                                     GL_BGRA,                                     GL_UNSIGNED_BYTE, }, // BGRA8
+    { GL_RGB,                                      GL_SRGB8,                                     GL_RGB,                                      GL_RGB,                                      GL_UNSIGNED_BYTE, }, // RGB8
+    { GL_RGB,                                      GL_ZERO,                                      GL_RGB,                                      GL_RGB,                                      GL_UNSIGNED_SHORT_5_6_5}, // RGB565 === MTLPixelFormatB5G6R5Unorm
+    { GL_RGBA,                                     GL_ZERO,                                      GL_RGBA,                                     GL_RGBA,                                     GL_UNSIGNED_SHORT_4_4_4_4}, // RGBA4 === MTLPixelFormatABGR4Unorm
+    { GL_RGBA,                                     GL_ZERO,                                      GL_RGBA,                                     GL_RGBA,                                     GL_UNSIGNED_SHORT_5_5_5_1}, // RGB5A1 === MTLPixelFormatA1BGR5Unorm
+    { GL_R8,                                       GL_ZERO,                                      GL_RED,                                      GL_RED,                                      GL_UNSIGNED_BYTE, }, // R8 In Shader: (R,0,0,0) GL3/GLES3 preferred
+    { GL_RG8,                                      GL_ZERO,                                      GL_RG,                                       GL_RG,                                       GL_UNSIGNED_BYTE, }, // RG8 In Shader: (R,G,0,0) GL3/GLES3 preferred
     { GL_RGBA32F_EXT,                              GL_ZERO,                                      GL_RGBA,                                     GL_ZERO,                                     GL_FLOAT, },         // RGBA32F
 
     /* depth stencil internalFormat | internalFormatSrgb | format | formatSrgb | type */
@@ -232,6 +232,19 @@ void UtilsGL::toGLTypes(PixelFormat textureFormat, GLint& internalFormat, GLuint
     {
         auto& info     = s_textureFormats[(int)textureFormat];
         internalFormat = info.internalFmt;
+        format         = info.fmt;
+        type           = info.type;
+    }
+}
+
+void UtilsGL::toGLTypes(const TextureDesc& desc, GLint& internalFormat, GLuint& format, GLenum& type)
+{
+    if (desc.pixelFormat < PixelFormat::COUNT) [[likely]]
+    {
+        const auto& info   = s_textureFormats[static_cast<int>(desc.pixelFormat)];
+        const bool useSrgb = desc.textureUsage == TextureUsage::READ && desc.colorSpace == ColorSpace::Srgb &&
+                             info.internalFmtSrgb != GL_ZERO;
+        internalFormat = useSrgb ? info.internalFmtSrgb : info.internalFmt;
         format         = info.fmt;
         type           = info.type;
     }

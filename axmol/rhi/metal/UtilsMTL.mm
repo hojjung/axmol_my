@@ -148,6 +148,19 @@ MTLPixelFormat UtilsMTL::toMTLPixelFormat(PixelFormat textureFormat)
     return MTLPixelFormatInvalid;
 }
 
+MTLPixelFormat UtilsMTL::toMTLPixelFormat(const TextureDesc& desc)
+{
+    if (AX_LIKELY(desc.pixelFormat < PixelFormat::COUNT))
+    {
+        const auto& info = s_textureFormats[static_cast<int>(desc.pixelFormat)];
+        return desc.textureUsage == TextureUsage::READ && desc.colorSpace == ColorSpace::Srgb &&
+                       info.fmtSrgb != MTLPixelFormatInvalid
+                   ? info.fmtSrgb
+                   : info.fmt;
+    }
+    return MTLPixelFormatInvalid;
+}
+
 void UtilsMTL::generateMipmaps(id<MTLTexture> texture)
 {
     auto cmdQueue = static_cast<DriverImpl*>(axdrv)->getMTLCmdQueue();

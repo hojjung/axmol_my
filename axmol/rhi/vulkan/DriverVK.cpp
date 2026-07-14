@@ -783,7 +783,7 @@ SamplerHandle DriverImpl::createSampler(const SamplerDesc& desc)
     // Filter mapping
     const bool minLinear = ((int)desc.minFilter & (int)SamplerFilter::MIN_LINEAR) != 0;
     const bool magLinear = ((int)desc.magFilter & (int)SamplerFilter::MAG_LINEAR) != 0;
-    const bool mipLinear = ((int)desc.mipFilter & (int)SamplerFilter::MIP_LINEAR) != 0;
+    const bool mipLinear = desc.mipFilter == SamplerFilter::MIP_LINEAR;
 
     info.magFilter  = magLinear ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
     info.minFilter  = minLinear ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
@@ -843,7 +843,7 @@ SamplerHandle DriverImpl::createSampler(const SamplerDesc& desc)
     info.borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     info.unnormalizedCoordinates = VK_FALSE;
     info.minLod                  = 0.0f;
-    info.maxLod                  = VK_LOD_CLAMP_NONE;
+    info.maxLod                  = desc.mipFilter == SamplerFilter::MIP_DEFAULT ? 0.0f : VK_LOD_CLAMP_NONE;
     info.mipLodBias              = 0.0f;
 
     VkSampler sampler{};
@@ -925,6 +925,23 @@ bool DriverImpl::checkForFeatureSupported(FeatureType feature)
         VkFormatProperties fp{};
         vkGetPhysicalDeviceFormatProperties(_physical, VK_FORMAT_ASTC_4x4_UNORM_BLOCK, &fp);
         return (fp.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0;
+    }
+
+    case FeatureType::DEPTH_COMPARISON_SAMPLING:
+    {
+        constexpr VkFormat format = VK_FORMAT_D24_UNORM_S8_UINT;
+        constexpr VkFormatFeatureFlags requiredFeatures =
+            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
+        VkFormatProperties formatProperties{};
+        vkGetPhysicalDeviceFormatProperties(_physical, format, &formatProperties);
+        if ((formatProperties.optimalTilingFeatures & requiredFeatures) != requiredFeatures)
+            return false;
+
+        VkImageFormatProperties imageProperties{};
+        constexpr VkImageUsageFlags requiredUsage =
+            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        return vkGetPhysicalDeviceImageFormatProperties(_physical, format, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+                                                        requiredUsage, 0, &imageProperties) == VK_SUCCESS;
     }
 
     default:

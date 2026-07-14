@@ -60,7 +60,7 @@ public:
 
     void beginRenderPass(ID3D11DeviceContext*);
 
-    ID3D11RenderTargetView* getRTV(size_t idx) const { return _rtvs[idx]; }
+    ID3D11RenderTargetView* getRTV(size_t idx) const { return idx < _rtvs.size() ? _rtvs[idx] : nullptr; }
     ID3D11DepthStencilView* getDSV() const { return _dsv; }
 
     Attachment getColorAttachment(int index) const;

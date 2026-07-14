@@ -65,6 +65,7 @@ struct UtilsMTL
      * @return A MTLPixelFormat.
      */
     static MTLPixelFormat toMTLPixelFormat(PixelFormat textureFormat);
+    static MTLPixelFormat toMTLPixelFormat(const TextureDesc& desc);
 
     /**
      * Generate a complete set of mipmaps in given texture.

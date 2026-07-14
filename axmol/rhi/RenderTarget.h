@@ -67,6 +67,19 @@ public:
     virtual void setColorTexture(Texture* texture, int level = 0, int index = 0);
     virtual void setDepthStencilTexture(Texture* texture, int level = 0);
 
+    /**
+     * Returns the dimensions of the first available attachment.
+     *
+     * Color attachments take precedence so existing MRT targets keep their
+     * established extent. Depth-only targets fall back to the depth/stencil
+     * attachment.
+     */
+    int getWidth() const;
+    int getHeight() const;
+
+    /** Returns the number of contiguous, non-null color attachments. */
+    uint32_t getActiveColorAttachmentCount() const;
+
     bool isDirty() const { return !!_dirtyFlags; }
 
     ColorAttachment _color{};

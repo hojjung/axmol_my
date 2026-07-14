@@ -87,4 +87,38 @@ void RenderTarget::setDepthStencilTexture(Texture* texture, int level)
     }
 }
 
+int RenderTarget::getWidth() const
+{
+    for (const auto& color : _color)
+    {
+        if (color.texture)
+            return color.texture->getWidth();
+    }
+
+    return _depthStencil.texture ? _depthStencil.texture->getWidth() : 0;
+}
+
+int RenderTarget::getHeight() const
+{
+    for (const auto& color : _color)
+    {
+        if (color.texture)
+            return color.texture->getHeight();
+    }
+
+    return _depthStencil.texture ? _depthStencil.texture->getHeight() : 0;
+}
+
+uint32_t RenderTarget::getActiveColorAttachmentCount() const
+{
+    uint32_t count = 0;
+    for (const auto& color : _color)
+    {
+        if (!color.texture)
+            break;
+        ++count;
+    }
+    return count;
+}
+
 }  // namespace ax::rhi

@@ -186,7 +186,7 @@ void RenderTargetImpl::beginRenderPass(ID3D12GraphicsCommandList* cmd,
     }
     else
     {
-        pRTVs = _rtvHandles.data();
+        pRTVs = _numRTVs > 0 ? _rtvHandles.data() : nullptr;
 
         // Clear color attachments if requested
         for (auto i = 0; i < colorCount; ++i)
@@ -204,6 +204,8 @@ void RenderTargetImpl::beginRenderPass(ID3D12GraphicsCommandList* cmd,
         }
         if (_depthStencil)
         {
+            auto depthImpl = static_cast<TextureImpl*>(_depthStencil.texture);
+            depthImpl->transitionState(cmd, D3D12_RESOURCE_STATE_DEPTH_WRITE);
             pDSV = &_dsvHandle;
             if (bitmask::any(renderPassDesc.flags.clear, TargetBufferFlags::DEPTH_AND_STENCIL))
             {
@@ -233,6 +235,12 @@ void RenderTargetImpl::endRenderPass(ID3D12GraphicsCommandList* cmd, uint32_t im
                 break;
 
             texImpl->transitionState(cmd, texImpl->getRenderTargetFinalState());
+        }
+
+        if (_depthStencil)
+        {
+            auto depthImpl = static_cast<TextureImpl*>(_depthStencil.texture);
+            depthImpl->transitionState(cmd, depthImpl->getRenderTargetFinalState());
         }
     }
 }
@@ -311,6 +319,8 @@ bool RenderTargetImpl::rebuildSwapchainBuffers(IDXGISwapChain4* swapchain,
 
 RenderTargetImpl::Attachment RenderTargetImpl::getColorAttachment(int index) const
 {
+    if (index < 0 || static_cast<size_t>(index) >= _color.size())
+        return nullptr;
     return static_cast<TextureImpl*>(_color[index].texture);
 }
 

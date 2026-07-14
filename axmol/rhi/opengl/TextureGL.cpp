@@ -65,7 +65,7 @@ void TextureImpl::updateTextureDesc(const TextureDesc& desc)
 
     Texture::updateTextureDesc(desc);
 
-    UtilsGL::toGLTypes(desc.pixelFormat, _nativeDesc.internalFormat, _nativeDesc.format, _nativeDesc.type);
+    UtilsGL::toGLTypes(desc, _nativeDesc.internalFormat, _nativeDesc.format, _nativeDesc.type);
     switch (desc.textureType)
     {
     case TextureType::TEXTURE_2D:
@@ -96,7 +96,8 @@ void TextureImpl::invalidate()
 
 void TextureImpl::updateSamplerDesc(const SamplerDesc& desc)
 {
-    this->_nativeSampler = static_cast<GLuint>(SamplerCache::getInstance()->getSampler(desc));
+    _desc.samplerDesc = desc;
+    _nativeSampler    = static_cast<GLuint>(SamplerCache::getInstance()->getSampler(desc));
 }
 
 void TextureImpl::updateData(const void* data, int width, int height, int level, int layerIndex)

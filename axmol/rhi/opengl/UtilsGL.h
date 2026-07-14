@@ -76,6 +76,7 @@ struct UtilsGL
      * @param out isCompressed Specifies if the texel data is compressed.
      */
     static void toGLTypes(PixelFormat textureFormat, GLint& internalFormat, GLuint& format, GLenum& type);
+    static void toGLTypes(const TextureDesc& desc, GLint& internalFormat, GLuint& format, GLenum& type);
 
     /**
      * Convert compare function to GLenum. i.e. convert CompareFunc::NEVER to GL_NEVER.

@@ -34,6 +34,7 @@
 #include <dxgi1_3.h>
 #include <dxgi1_5.h>
 #include <VersionHelpers.h>
+#include <algorithm>
 #include "axmol/base/Logging.h"
 #include "axmol/platform/Application.h"
 
@@ -370,14 +371,13 @@ void RenderContextImpl::beginRenderPass(RenderTarget* renderTarget, const Render
 
     activeRT->beginRenderPass(_d3d11Context);
 
-    auto colorAttachment = activeRT->getColorAttachment(0);
-    _renderTargetWidth   = colorAttachment.desc.width;
-    _renderTargetHeight  = colorAttachment.desc.height;
+    _renderTargetWidth  = static_cast<uint32_t>(activeRT->getWidth());
+    _renderTargetHeight = static_cast<uint32_t>(activeRT->getHeight());
 
     auto clearFlags = renderPassDesc.flags.clear;
 
     // clear color
-    if (bitmask::any(clearFlags, TargetBufferFlags::COLOR))
+    if (bitmask::any(clearFlags, TargetBufferFlags::COLOR) && activeRT->getRTV(0))
         _d3d11Context->ClearRenderTargetView(activeRT->getRTV(0), renderPassDesc.clearColorValue.data());
 
     // clear depth & stencil
@@ -685,7 +685,7 @@ void RenderContextImpl::prepareDrawing()
             context->PSSetShaderResources(slot, 1, &textureImpl->internalHandle().srv);
             auto samplerState = textureImpl->getSamplerState();
             context->PSSetSamplers(slot, 1, &samplerState);
-            ++_textureBounds;
+            _textureBounds = std::max(_textureBounds, slot + 1);
         }
     }
 
@@ -755,7 +755,7 @@ void RenderContextImpl::readPixels(RenderTarget* rt, std::function<void(const Pi
     }
     else
     {
-        auto colorAttachment = rt->_color[0].texture;
+        auto colorAttachment = !rt->_color.empty() ? rt->_color[0].texture : nullptr;
         if (colorAttachment)
         {
             uint32_t width  = colorAttachment->getWidth();

@@ -646,6 +646,11 @@ bool DriverImpl::checkForFeatureSupported(FeatureType feature)
     case FeatureType::ASTC:
         featureSupported = supportASTC(_featureSet);
         break;
+    case FeatureType::DEPTH_COMPARISON_SAMPLING:
+        // PixelFormat::D24S8 maps to Depth24Unorm_Stencil8 when available and
+        // otherwise to the sampleable Depth32Float_Stencil8 fallback format.
+        featureSupported = true;
+        break;
     default:
         break;
     }

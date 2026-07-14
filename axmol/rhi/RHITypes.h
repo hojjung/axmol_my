@@ -701,6 +701,14 @@ struct ProgramType
         POSITION_3D,                          // positionTexture_vert,            color_frag
         POSITION_BUMPEDNORMAL_TEXTURE_3D,     // positionNormalTexture_vert,      colorNormalTexture_frag
         SKINPOSITION_BUMPEDNORMAL_TEXTURE_3D, // skinPositionNormalTexture_vert,  colorNormalTexture_frag
+        STYLIZED_3D,                          // stylized_vert,                    stylized_frag
+        STYLIZED_CUTOUT_3D,                   // stylized_vert,                    stylized_frag_1
+        STYLIZED_SKIN_3D,                     // stylizedSkin_vert,                stylized_frag
+        STYLIZED_SKIN_CUTOUT_3D,              // stylizedSkin_vert,                stylized_frag_1
+        STYLIZED_SHADOW_3D,                    // stylizedShadow_vert,              stylizedShadow_frag
+        STYLIZED_SHADOW_CUTOUT_3D,             // stylizedShadow_vert,              stylizedShadow_frag_1
+        STYLIZED_SHADOW_SKIN_3D,               // stylizedShadowSkin_vert,          stylizedShadow_frag
+        STYLIZED_SHADOW_SKIN_CUTOUT_3D,        // stylizedShadowSkin_vert,          stylizedShadow_frag_1
         PARTICLE_TEXTURE_3D,                  // particle_vert,                   particleTexture_frag
         PARTICLE_COLOR_3D,                    // particle_vert,                   particleColor_frag
 

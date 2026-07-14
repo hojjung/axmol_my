@@ -425,19 +425,24 @@ D3D12_RESOURCE_STATES TextureImpl::ensureNativeTexture(bool prepareForCopyDest, 
     const UINT arrayLayers = isCube ? 6u : static_cast<UINT>(_desc.arraySize);
 
     D3D12_RESOURCE_DESC texDesc{};
-    texDesc.Dimension          = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    texDesc.Alignment          = 0;
-    texDesc.Width              = _desc.width;
-    texDesc.Height             = _desc.height;
-    texDesc.DepthOrArraySize   = arrayLayers;
-    texDesc.MipLevels          = mipLevels;
-    texDesc.Format             = fmtInfo->format;
+    texDesc.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    texDesc.Alignment        = 0;
+    texDesc.Width            = _desc.width;
+    texDesc.Height           = _desc.height;
+    texDesc.DepthOrArraySize = arrayLayers;
+    texDesc.MipLevels        = mipLevels;
+    // The compute mip generator writes through UAVs, which do not support
+    // typed sRGB formats. Precomputed-mip textures (including KTX2 albedo)
+    // use the sRGB resource/view directly; the legacy GPU-generated path
+    // keeps its existing linear resource contract.
+    const bool gpuGeneratedMipmaps = shouldGenMipmaps();
+    texDesc.Format = gpuGeneratedMipmaps ? fmtInfo->format : dxutils::selectTextureResourceFormat(*fmtInfo, _desc);
     texDesc.SampleDesc.Count   = 1;
     texDesc.SampleDesc.Quality = 0;
     texDesc.Layout             = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     texDesc.Flags              = D3D12_RESOURCE_FLAG_NONE;
 
-    if (shouldGenMipmaps())
+    if (gpuGeneratedMipmaps)
         texDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
     D3D12_HEAP_PROPERTIES heapProps{};
@@ -483,20 +488,21 @@ D3D12_RESOURCE_STATES TextureImpl::ensureNativeTexture(bool prepareForCopyDest, 
     // create texture resource
     HRESULT hr = device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &texDesc, initialResourceState,
                                                  pClearValue, IID_PPV_ARGS(&_nativeTexture.resource));
+    _AXASSERT_HR(hr);
 
     // AXLOGD("TextureImpl: Created resource:{} for {}", fmt::ptr(_nativeTexture.resource.Get()), fmt::ptr(this));
 
-    // non depth-stencil texture, we need create SRV for sampling, even through it's textureUsage=RENDER_TARGET
-    if (_desc.pixelFormat != PixelFormat::D24S8)
-        createShaderResourceView(fmtInfo, mipLevels, arrayLayers, isCube, device);
-    assert(SUCCEEDED(hr));
+    // Render targets remain sampleable. D24S8 uses a typeless resource with a
+    // depth-only SRV format supplied by dxutils::PixelFormatInfo.
+    const auto srvFormat = gpuGeneratedMipmaps ? fmtInfo->fmtSrv : dxutils::selectTextureSrvFormat(*fmtInfo, _desc);
+    createShaderResourceView(srvFormat, mipLevels, arrayLayers, isCube, device);
 
     setKnownState(initialResourceState);
 
     return initialResourceState;
 }
 
-void TextureImpl::createShaderResourceView(const dxutils::PixelFormatInfo* fmtInfo,
+void TextureImpl::createShaderResourceView(DXGI_FORMAT srvFormat,
                                            uint32_t mipLevels,
                                            uint32_t arrayLayers,
                                            bool isCube,
@@ -504,7 +510,7 @@ void TextureImpl::createShaderResourceView(const dxutils::PixelFormatInfo* fmtIn
 {
     // --- Create SRV for normal texture ---
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-    srvDesc.Format                  = fmtInfo->fmtSrv;
+    srvDesc.Format                  = srvFormat;
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
     if (isCube)

@@ -94,7 +94,9 @@ void RenderTargetImpl::update()
         return;
     if (!_defaultRenderTarget)
     {
-        if (bitmask::any(_dirtyFlags, TargetBufferFlags::COLOR_ALL))
+        const bool hasColorAttachment = getActiveColorAttachmentCount() != 0;
+        if (bitmask::any(_dirtyFlags, TargetBufferFlags::COLOR_ALL) ||
+            (!hasColorAttachment && bitmask::any(_dirtyFlags, TargetBufferFlags::DEPTH_AND_STENCIL)))
         {  // color attachments
             std::fill(_GLbufs.begin(), _GLbufs.end(), GL_NONE);
             const auto colorCount = _color.size();
@@ -110,7 +112,17 @@ void RenderTargetImpl::update()
                         textureInfo.level);
             }
 
-            glDrawBuffers(colorCount, _GLbufs.data());
+            if (colorCount > 0)
+            {
+                glDrawBuffers(static_cast<GLsizei>(colorCount), _GLbufs.data());
+                glReadBuffer(hasColorAttachment ? _GLbufs.front() : GL_NONE);
+            }
+            else
+            {
+                const GLenum none = GL_NONE;
+                glDrawBuffers(1, &none);
+                glReadBuffer(GL_NONE);
+            }
 
             CHECK_GL_ERROR_DEBUG();
         }
@@ -125,6 +137,11 @@ void RenderTargetImpl::update()
                                    _depthStencil.level);
             CHECK_GL_ERROR_DEBUG();
         }
+
+#if !defined(NDEBUG)
+        const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        AXASSERT(status == GL_FRAMEBUFFER_COMPLETE, "OpenGL render target is incomplete");
+#endif
     }
 
     _dirtyFlags = TargetBufferFlags::NONE;

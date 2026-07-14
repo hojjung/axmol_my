@@ -68,6 +68,8 @@ public:
      */
     inline TextureUsage getTextureUsage() const { return _desc.textureUsage; }
 
+    inline ColorSpace getColorSpace() const { return _desc.colorSpace; }
+
     /**
      * Get texture type. Symbolic constant value can be either TEXTURE_2D or TEXTURE_CUBE.
      * @return Texture type.
