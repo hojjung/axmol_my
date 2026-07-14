@@ -88,6 +88,8 @@ include(AXGameTargetSetup)
 ax_setup_app_config(${APP_NAME})
 
 # Add any libraries you need to link to the project after this point
+add_subdirectory(GameCore)
+target_link_libraries(${APP_NAME} cmc::game_core)
 
 # Default Platform-specific setup
 include(AXGamePlatformSetup)

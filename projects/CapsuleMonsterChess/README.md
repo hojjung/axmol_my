@@ -1,9 +1,21 @@
 # Capsule Monster Chess
 
-Axmol 멀티플랫폼 프로젝트 기반이다. 현재 첫 씬은 `Dragon Fire@Fly Idle.FBX`를
+세로형 Axmol 멀티플랫폼 프로젝트 기반이다. 현재 첫 씬은 `Dragon Fire@Fly Idle.FBX`를
 호스트에서 GLB로 변환해 Stylized Forward Renderer로 표시한다. 재질은 Unity의
 JMO ramp/diffuse tint와 AC directional rim/SSS 특성을 런타임 파라미터로 재구현하며,
 원본 유료 셰이더 코드는 포함하지 않는다.
+
+## 프로젝트 경계
+
+- `Source`: Axmol 클라이언트, UI, 렌더링과 네트워크 어댑터
+- `GameCore`: 클라이언트·서버 공용 순수 C++17 전투 코어
+- `Server`: private Cloud Run용 headless C++ 어댑터
+- `Backend`: Firebase Auth/Firestore/Functions 공개 API 경계
+- `Content/Data/Tables`: 클라이언트·서버 공용 canonical JSON
+- `Tests/GameCore`: 결정성, 육각 보드, Unity golden tests
+
+기획과 구현 순서는 [GameDesign](docs/GameDesign.md), [Architecture](docs/Architecture.md),
+[Milestone 01](docs/Milestone01.md), [Unity Port Map](docs/UnityPortMap.md)을 기준으로 한다.
 
 ## 로컬 자산 변환
 

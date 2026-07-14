@@ -42,7 +42,8 @@
 
 using namespace ax;
 
-static ax::Size designResolutionSize = ax::Size(1280, 720);
+static ax::Size designResolutionSize = ax::Size(720, 1280);
+static ax::Size desktopWindowSize    = ax::Size(405, 720);
 
 AppDelegate::AppDelegate() {}
 
@@ -100,6 +101,9 @@ bool AppDelegate::applicationDidFinishLaunching()
     {
 #if (AX_TARGET_PLATFORM == AX_PLATFORM_WIN32) || (AX_TARGET_PLATFORM == AX_PLATFORM_MAC) || \
     (AX_TARGET_PLATFORM == AX_PLATFORM_LINUX)
+        renderView = RenderView::createWithRect(
+            "CapsuleMonsterChess", ax::Rect(0, 0, desktopWindowSize.width, desktopWindowSize.height));
+#elif AX_TARGET_PLATFORM == AX_PLATFORM_WASM
         renderView = RenderView::createWithRect(
             "CapsuleMonsterChess", ax::Rect(0, 0, designResolutionSize.width, designResolutionSize.height));
 #else
