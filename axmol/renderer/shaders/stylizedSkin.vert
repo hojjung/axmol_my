@@ -27,11 +27,12 @@ layout(std140, set = UNIFORM_SET, binding = VS_UB_BINDING) uniform vs_ub {
 
 vec2 transformTexCoord(vec2 texCoord)
 {
+    // Keep the glTF/KTX2 upper-left origin; this must match the static variant.
     vec2 scaled = texCoord * u_stylizedUvTransform[0].zw;
     vec2 rotated = vec2(u_stylizedUvTransform[1].x * scaled.x - u_stylizedUvTransform[1].y * scaled.y,
                         u_stylizedUvTransform[1].y * scaled.x + u_stylizedUvTransform[1].x * scaled.y);
     vec2 transformed = u_stylizedUvTransform[0].xy + rotated;
-    return vec2(transformed.x, 1.0 - transformed.y);
+    return transformed;
 }
 
 void getSkinnedPositionAndNormal(out vec4 position, out vec3 normal)

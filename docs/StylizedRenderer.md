@@ -119,6 +119,10 @@ stylized->setConfig(config);
 
 런타임에는 `cgltf`, meshoptimizer decoder, Basis Universal transcoder와 Zstd decoder만 포함한다. FBX, Assimp, gltfpack, Basis encoder는 포함하지 않는다. KTX2 업로드 대상은 capability에 따라 ASTC 4x4, ETC2 RGBA, BC3, RGBA8 순서로 선택하고 decoded mip 데이터는 업로드 직후 해제한다. WebGL2는 ETC2/EAC를 core로 제공하지 않으며 ETC 계열 또는 S3TC 계열 중 하나만 보장하므로 두 transcoder target을 모두 유지한다.
 
+glTF와 KTX2는 모두 논리적 좌상단을 `(0, 0)`으로 정의한다. Stylized beauty와 alpha-cutout shadow의 static/skinned 셰이더는 `KHR_texture_transform`을 적용한 좌표를 그대로 샘플링하며, 레거시 Axmol 3D 셰이더의 추가 V-flip을 적용하지 않는다. 네 variant 중 하나에만 flip을 넣으면 base color와 alpha shadow가 서로 다른 위치를 읽으므로 반드시 함께 유지한다.
+
+Base color는 sRGB texture view에서 Linear로 읽고 조명도 Linear에서 계산한다. 현재 RHI swapchain과 stylized intermediate는 UNORM target이므로 beauty 출력에서 Linear-to-sRGB transfer를 한 번 적용한다. toon band, shadow visibility, rim mask debug 출력은 수치 검증용 Linear 값이므로 transfer를 적용하지 않는다.
+
 지원 범위를 넘는 skin이나 손상된 offset/length를 조용히 잘라내지 않고 load 실패로 처리한다. Morph target과 임의의 glTF extension은 현재 런타임 계약에 포함하지 않는다.
 
 ## axasset
@@ -178,7 +182,9 @@ cmake -S . -B build/stylized-web-single \
 cmake --build build/stylized-web-single --target stylized-smoke
 ```
 
-WebGL context loss 중에는 frame 제출을 중단한다. restore event에서 RHI resource, shadow target, stylized scaled target/pipeline과 texture를 재생성한다. KTX2 texture는 compact encoded source를 보관하고 restore 순간에만 임시 decode하여 GPU upload 뒤 해제한다.
+WebGL context loss 중에는 frame 제출을 중단한다. lost context의 native handle은 새 context에서 bind/delete하지 않고 폐기한다. restore event에서는 지원 extension을 먼저 다시 활성화하고 capability/compressed-format 목록을 갱신한 뒤 shared VAO, RHI resource, shadow target, stylized scaled target/pipeline, retained texture와 dynamic DrawNode buffer를 재생성한다. Scene에서 잠시 분리된 pooled DrawNode도 fixed listener로 CPU geometry를 dirty 처리해 재부착 후 업로드한다. Program relink는 WASM에서만 generic Buffer 복구보다 먼저 실행해 old UBO listener를 제거하며, native GL의 기존 복구 순서는 실기기 lifecycle gate 없이 바꾸지 않는다. Shadow sampler binding은 old texture를 명시적으로 clear한 뒤 새 atlas가 준비된 다음 frame에 다시 설치한다. KTX2 texture는 compact encoded source를 보관하고 restore 순간에만 임시 decode하여 GPU upload 뒤 해제한다.
+
+강제 context loss 직후 callback 전달 전에는 `CONTEXT_LOST_WEBGL` 진단이 기록될 수 있다. 합격 판정은 restore 완료 뒤 연속 `glGetError() == 0`, DOM smoke flag 유지, 압축 texture capability 복구, character/shadow/native UI가 보이는 실제 pixel로 한다. 한 번의 reload 성공을 context restore 성공으로 대체하지 않는다.
 
 ## 지원 게이트
 

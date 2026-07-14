@@ -635,6 +635,11 @@ function(ax_setup_app_config app_name)
         ax_target_embed_compiled_shaders(${app_name} ${rt_output} FILES ${all_compiled_shaders})
       else()
         # refer to: https://emscripten.org/docs/porting/files/packaging_files.html
+        # Emscripten packs this directory during the link step. A target-level
+        # dependency only orders shader compilation; LINK_DEPENDS also forces
+        # the package to be regenerated when a compiled shader changes.
+        get_target_compiled_shaders(all_compiled_shaders ${app_name})
+        set_property(TARGET ${app_name} APPEND PROPERTY LINK_DEPENDS ${all_compiled_shaders})
         target_link_options(${app_name} PRIVATE ${AX_WASM_ASSETS_LINKER_FLAG} ${AXSLCC_OUT_DIR}@axslc/)
       endif()
     endif()

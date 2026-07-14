@@ -18,6 +18,42 @@ set(_APP_RES_FOLDER
   "${_AX_ROOT}/tests/unit-tests/Source/axmol/3d/fixtures"
 )
 
+set(AX_STYLIZED_SMOKE_CHARACTER_GLTF "" CACHE FILEPATH
+  "Optional local GLB character used only for manual stylized WebGL validation")
+if(AX_STYLIZED_SMOKE_CHARACTER_GLTF)
+  if(CMAKE_CURRENT_BINARY_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    message(FATAL_ERROR
+      "Manual stylized character validation requires an out-of-source build")
+  endif()
+
+  get_filename_component(_stylized_smoke_character
+    "${AX_STYLIZED_SMOKE_CHARACTER_GLTF}" ABSOLUTE)
+  if(NOT EXISTS "${_stylized_smoke_character}" OR IS_DIRECTORY "${_stylized_smoke_character}")
+    message(FATAL_ERROR
+      "AX_STYLIZED_SMOKE_CHARACTER_GLTF must name a readable GLB file: "
+      "${_stylized_smoke_character}")
+  endif()
+
+  get_filename_component(_stylized_smoke_character_extension
+    "${_stylized_smoke_character}" EXT)
+  string(TOLOWER "${_stylized_smoke_character_extension}"
+    _stylized_smoke_character_extension)
+  if(NOT _stylized_smoke_character_extension STREQUAL ".glb")
+    message(FATAL_ERROR
+      "Manual stylized smoke characters must use .glb input; external resources are not copied: "
+      "${_stylized_smoke_character}")
+  endif()
+
+  set(_stylized_smoke_manual_content
+    "${CMAKE_CURRENT_BINARY_DIR}/manual-content")
+  file(MAKE_DIRECTORY "${_stylized_smoke_manual_content}")
+  configure_file("${_stylized_smoke_character}"
+    "${_stylized_smoke_manual_content}/stylized-character.glb" COPYONLY)
+  list(APPEND _APP_RES_FOLDER "${_stylized_smoke_manual_content}")
+  target_compile_definitions(${APP_NAME} PRIVATE
+    AX_STYLIZED_SMOKE_CHARACTER_GLTF="stylized-character.glb")
+endif()
+
 ax_setup_app_config(${APP_NAME})
 ax_setup_app_props(${APP_NAME})
 

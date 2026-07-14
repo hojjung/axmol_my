@@ -87,6 +87,16 @@ float pointAttenuation(vec3 toLight, float inverseRange)
     return attenuation * attenuation;
 }
 
+vec3 linearToSrgb(vec3 linearColor)
+{
+    // Axmol swapchains and the stylized intermediate are UNORM targets. Keep
+    // debug masks raw and encode only the final linear-lit beauty color.
+    vec3 color = max(linearColor, vec3(0.0));
+    vec3 low   = color * 12.92;
+    vec3 high  = 1.055 * pow(color, vec3(1.0 / 2.4)) - 0.055;
+    return mix(low, high, step(vec3(0.0031308), color));
+}
+
 layout(location = SV_Target0) out vec4 FragColor;
 
 void main()
@@ -157,5 +167,5 @@ void main()
     vec3 lighting = directTint + u_stylizedLightData[2].rgb + pointDiffuse;
     vec3 color = albedo.rgb * u_stylizedMaterial[3].rgb * lighting;
     color += u_stylizedMaterial[4].rgb * rim;
-    FragColor = vec4(color, albedo.a);
+    FragColor = vec4(linearToSrgb(color), albedo.a);
 }

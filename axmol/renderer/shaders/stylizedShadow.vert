@@ -15,11 +15,12 @@ layout(std140, set = UNIFORM_SET, binding = VS_UB_BINDING) uniform vs_ub {
 
 vec2 transformTexCoord(vec2 texCoord)
 {
+    // Alpha-cutout shadow sampling must use the same glTF/KTX2 origin as beauty.
     vec2 scaled = texCoord * u_stylizedUvTransform[0].zw;
     vec2 rotated = vec2(u_stylizedUvTransform[1].x * scaled.x - u_stylizedUvTransform[1].y * scaled.y,
                         u_stylizedUvTransform[1].y * scaled.x + u_stylizedUvTransform[1].x * scaled.y);
     vec2 transformed = u_stylizedUvTransform[0].xy + rotated;
-    return vec2(transformed.x, 1.0 - transformed.y);
+    return transformed;
 }
 
 void main()

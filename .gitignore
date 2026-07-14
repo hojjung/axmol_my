@@ -151,6 +151,7 @@ project.properties
 /templates/lua-template-default/src/core/
 /tests/lua-tests/src/core/
 /tests/js-tests/res/
+/**/manual-content/stylized-character.glb
 /tools/framework-compile/bin/proj_modifier/plutil-win32/
 !/tools/framework-compile/bin/
 

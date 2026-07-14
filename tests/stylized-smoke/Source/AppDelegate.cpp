@@ -26,11 +26,17 @@
 
 #include "axmol/2d/DrawNode.h"
 #include "axmol/2d/Light.h"
+#include "axmol/3d/Animate3D.h"
+#include "axmol/3d/Animation3D.h"
 #include "axmol/3d/Mesh.h"
 #include "axmol/3d/MeshRenderer.h"
 #include "axmol/3d/StylizedMaterial.h"
 #include "axmol/3d/StylizedRenderer.h"
 #include "axmol/scene/CameraBackgroundBrush.h"
+
+#include <algorithm>
+#include <cmath>
+#include <memory>
 
 #if defined(__EMSCRIPTEN__)
 #    include <emscripten.h>
@@ -95,8 +101,149 @@ MeshRenderer* makeGround(StylizedMaterial* material)
     const std::vector<float> normals   = {0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0};
     const std::vector<float> texCoords = {0, 0, 1, 0, 1, 1, 0, 1};
     return makeMesh(positions, normals, texCoords,
-                    IndexArray{uint16_t{0}, uint16_t{1}, uint16_t{2}, uint16_t{0}, uint16_t{2}, uint16_t{3}}, material);
+                    IndexArray{uint16_t{0}, uint16_t{2}, uint16_t{1}, uint16_t{0}, uint16_t{3}, uint16_t{2}}, material);
 }
+
+#if defined(AX_STYLIZED_SMOKE_CHARACTER_GLTF)
+void publishCharacterState(bool loaded,
+                           bool textured,
+                           bool skinned,
+                           bool animationLoaded,
+                           ssize_t meshCount,
+                           ssize_t jointCount,
+                           float animationDuration)
+{
+#    if defined(__EMSCRIPTEN__)
+    EM_ASM(
+        {
+            var state                    = window['axmolStylizedSmoke'] || {};
+            state['characterLoaded']     = Boolean($0);
+            state['characterTextured']   = Boolean($1);
+            state['characterSkinned']    = Boolean($2);
+            state['animationLoaded']     = Boolean($3);
+            state['characterMeshes']     = $4;
+            state['characterJoints']     = $5;
+            state['animationDuration']   = $6;
+            state['poseChanged']         = false;
+            window['axmolStylizedSmoke'] = state;
+
+            var root = document.documentElement;
+            root.setAttribute('data-axmol-character-loaded', state['characterLoaded'] ? '1' : '0');
+            root.setAttribute('data-axmol-character-textured', state['characterTextured'] ? '1' : '0');
+            root.setAttribute('data-axmol-character-skinned', state['characterSkinned'] ? '1' : '0');
+            root.setAttribute('data-axmol-animation-loaded', state['animationLoaded'] ? '1' : '0');
+            root.setAttribute('data-axmol-character-meshes', String(state['characterMeshes']));
+            root.setAttribute('data-axmol-character-joints', String(state['characterJoints']));
+            root.setAttribute('data-axmol-animation-duration', String(state['animationDuration']));
+            root.setAttribute('data-axmol-pose-changed', '0');
+        },
+        loaded, textured, skinned, animationLoaded, meshCount, jointCount, animationDuration);
+#    else
+    (void)loaded;
+    (void)textured;
+    (void)skinned;
+    (void)animationLoaded;
+    (void)meshCount;
+    (void)jointCount;
+    (void)animationDuration;
+#    endif
+}
+
+void publishPoseChanged(bool changed)
+{
+#    if defined(__EMSCRIPTEN__)
+    EM_ASM(
+        {
+            var state                    = window['axmolStylizedSmoke'] || {};
+            state['poseChanged']         = Boolean($0);
+            window['axmolStylizedSmoke'] = state;
+            document.documentElement.setAttribute('data-axmol-pose-changed', state['poseChanged'] ? '1' : '0');
+        },
+        changed);
+#    else
+    (void)changed;
+#    endif
+}
+
+MeshRenderer* makeManualCharacter(Scene& scene)
+{
+    constexpr std::string_view path = AX_STYLIZED_SMOKE_CHARACTER_GLTF;
+    auto* character                 = MeshRenderer::create(path);
+    auto* skeleton                  = character ? character->getSkeleton() : nullptr;
+    auto* material = character && character->getMeshCount() > 0
+                         ? dynamic_cast<StylizedMaterial*>(character->getMaterial(0))
+                         : nullptr;
+    auto* animation = character ? Animation3D::create(path) : nullptr;
+
+    const bool textured = material && material->getDescription().baseTexture;
+    const bool skinned = skeleton && character->getMesh() && character->getMesh()->getSkin() && material &&
+                         material->isSkinned();
+    publishCharacterState(character != nullptr, textured, skinned, animation != nullptr,
+                          character ? character->getMeshCount() : 0, skeleton ? skeleton->getBoneCount() : 0,
+                          animation ? animation->getDuration() : 0.0F);
+
+    AXASSERT(character && textured && skinned && animation && animation->getDuration() > 0.0F,
+             "manual stylized character must load its texture, skin, and animation");
+    if (!character || !textured || !skinned || !animation || animation->getDuration() <= 0.0F)
+        return nullptr;
+
+    character->setCameraMask(WORLD_CAMERA_MASK);
+    character->setCastShadow(true);
+    character->setReceiveShadow(true);
+
+    auto characterMaterial = material->getDescription();
+    characterMaterial.shadowColor = Color{0.32F, 0.32F, 0.32F, 1.0F};
+    characterMaterial.bandThreshold = 0.68F;
+    characterMaterial.bandSoftness  = 0.18F;
+    characterMaterial.rimColor      = Color{1.0F, 0.72F, 0.42F, 1.0F};
+    characterMaterial.rimStart      = 0.76F;
+    characterMaterial.rimIntensity  = 0.55F;
+    const bool materialTuned = material->setDescription(characterMaterial);
+    AXASSERT(materialTuned, "manual stylized character material tuning failed");
+    if (!materialTuned)
+        return nullptr;
+
+    const AABB bounds     = character->getAABBRecursively();
+    const AABB bindBounds = character->getMesh()->getAABB();
+    const Vec3 bindSize   = bindBounds._max - bindBounds._min;
+    const float bindExtent = std::max({bindSize.x, bindSize.y, bindSize.z});
+    if (!bounds.isEmpty() && !bindBounds.isEmpty() && bindExtent > 1.0e-4F)
+    {
+        constexpr float targetExtent = 4.15F;
+        const float scale            = targetExtent / bindExtent;
+        const Vec3 center            = (bounds._min + bounds._max) * 0.5F;
+        character->setScale(scale);
+        character->setPosition3D({-center.x * scale, 0.03F - bounds._min.y * scale, -center.z * scale});
+        character->setRotation3D({0.0F, -18.0F, 0.0F});
+    }
+    auto* wing = skeleton->getBoneByName("RigLWing03");
+    if (!wing && skeleton->getBoneCount() > 1)
+        wing = skeleton->getBoneByIndex(1);
+    AXASSERT(wing, "manual stylized character must expose an animated probe bone");
+
+    character->runAction(RepeatForever::create(Animate3D::create(animation)));
+    scene.addChild(character);
+
+    if (wing)
+    {
+        auto firstPose = std::make_shared<Mat4>(Mat4::identity);
+        auto* probe    = Node::create();
+        probe->runAction(Sequence::create(
+            DelayTime::create(0.2F), CallFunc::create([wing, firstPose] { *firstPose = wing->getWorldMat(); }),
+            DelayTime::create(0.37F),
+            CallFunc::create([wing, firstPose] {
+                const Mat4& secondPose = wing->getWorldMat();
+                float maximumDelta     = 0.0F;
+                for (size_t index = 0; index < 16; ++index)
+                    maximumDelta = std::max(maximumDelta, std::abs(secondPose.m[index] - firstPose->m[index]));
+                publishPoseChanged(maximumDelta > 1.0e-4F);
+            }),
+            nullptr));
+        scene.addChild(probe);
+    }
+    return character;
+}
+#endif
 
 Scene* makeScene()
 {
@@ -107,20 +254,54 @@ Scene* makeScene()
     uiCamera->setBackgroundBrush(CameraBackgroundBrush::createNoneBrush());
 
     const auto canvas = director->getCanvasSize();
+#if defined(AX_STYLIZED_SMOKE_CHARACTER_GLTF)
+    auto* worldCamera = Camera::createPerspective(42.0F, canvas.width / canvas.height, 0.1F, 50.0F);
+#else
     auto* worldCamera = Camera::createPerspective(50.0F, canvas.width / canvas.height, 0.1F, 50.0F);
+#endif
     worldCamera->setCameraFlag(CameraFlag::USER1);
     worldCamera->setDepth(-1);
+#if defined(AX_STYLIZED_SMOKE_CHARACTER_GLTF)
+    // Keep the whole view below the horizon so the character reads against a
+    // single pastel playfield, as it will in the product camera.
+    worldCamera->setPosition3D({0.0F, 5.8F, 8.2F});
+    worldCamera->lookAt({0.0F, 2.15F, 0.0F});
+#else
     worldCamera->setPosition3D({0.0F, 3.0F, 8.0F});
     worldCamera->lookAt({0.0F, 0.5F, 0.0F});
+#endif
+#if defined(AX_STYLIZED_SMOKE_CHARACTER_GLTF)
+    worldCamera->setBackgroundBrush(
+        CameraBackgroundBrush::createColorBrush(Color{0.5176471F, 0.4901961F, 0.6862745F, 1.0F}, 1.0F));
+#else
     worldCamera->setBackgroundBrush(CameraBackgroundBrush::createColorBrush(Color{0.62F, 0.78F, 0.86F, 1.0F}, 1.0F));
+#endif
     scene->addChild(worldCamera);
 
+#if defined(AX_STYLIZED_SMOKE_CHARACTER_GLTF)
+    auto* mainLight = DirectionLight::create(Vec3{0.55F, -1.0F, -0.85F}, Color32{255, 226, 196, 255});
+#else
     auto* mainLight = DirectionLight::create(Vec3{-0.7F, -1.0F, -0.4F}, Color32{255, 224, 188, 255});
+#endif
     mainLight->setCameraMask(WORLD_CAMERA_MASK);
+#if defined(AX_STYLIZED_SMOKE_CHARACTER_GLTF)
+    mainLight->setIntensity(1.15F);
+#endif
     scene->addChild(mainLight);
 
+#if defined(AX_STYLIZED_SMOKE_CHARACTER_GLTF)
+    auto* ambientLight = AmbientLight::create(Color32{158, 145, 176, 255});
+    ambientLight->setIntensity(0.65F);
+    ambientLight->setCameraMask(WORLD_CAMERA_MASK);
+    scene->addChild(ambientLight);
+#endif
+
     StylizedRendererConfig config;
+#if defined(AX_STYLIZED_SMOKE_CHARACTER_GLTF)
+    config.qualityPreset = StylizedQualityPreset::Balanced;
+#else
     config.qualityPreset                   = StylizedQualityPreset::Auto30;
+#endif
     config.reserveDefaultCameraForNativeUi = true;
     auto* stylized                         = StylizedRenderer::attach(*scene, config);
     stylized->setMainLight(mainLight);
@@ -136,16 +317,29 @@ Scene* makeScene()
 
     StylizedMaterialDesc groundDesc;
     groundDesc.baseTexture = director->getTextureCache()->getWhiteTexture();
+#if defined(AX_STYLIZED_SMOKE_CHARACTER_GLTF)
+    groundDesc.baseColor = Color{0.18F, 0.22F, 0.65F, 1.0F};
+    groundDesc.rimIntensity = 0.0F;
+#else
     groundDesc.baseColor   = Color{0.46F, 0.72F, 0.38F, 1.0F};
+#endif
     auto* groundMaterial   = StylizedMaterial::create(groundDesc);
 
+    auto* ground = makeGround(groundMaterial);
+#if defined(AX_STYLIZED_SMOKE_CHARACTER_GLTF)
+    ground->setScale(8.0F);
+    ground->setCastShadow(false);
+#endif
+    scene->addChild(ground);
+
+#if defined(AX_STYLIZED_SMOKE_CHARACTER_GLTF)
+    auto* manualCharacter = makeManualCharacter(*scene);
+    AXASSERT(manualCharacter, "manual stylized character smoke setup failed");
+#else
     auto* cube = makeCube(cubeMaterial);
     cube->setPosition3D({0.0F, 1.2F, 0.0F});
     cube->runAction(RepeatForever::create(RotateBy::create(5.0F, Vec3{0.0F, 360.0F, 0.0F})));
     scene->addChild(cube);
-
-    auto* ground = makeGround(groundMaterial);
-    scene->addChild(ground);
 
     auto* meshoptTriangle = MeshRenderer::create("meshopt.gltf");
     auto* importedMeshNode =
@@ -194,13 +388,16 @@ Scene* makeScene()
         },
         meshoptTriangle != nullptr, meshoptTriangle ? meshoptTriangle->getMeshCount() : 0);
 #endif
+#endif
 
+#if !defined(AX_STYLIZED_SMOKE_CHARACTER_GLTF)
     // This bar remains on CameraFlag::DEFAULT and therefore proves the UI is
     // rendered after the scaled world composite at native canvas resolution.
     auto* nativeUi = DrawNode::create();
     nativeUi->drawSolidRect({24.0F, canvas.height - 42.0F}, {344.0F, canvas.height - 22.0F},
                             Color{0.10F, 0.95F, 0.72F, 1.0F});
     scene->addChild(nativeUi);
+#endif
     return scene;
 }
 }  // namespace
@@ -222,6 +419,7 @@ bool AppDelegate::applicationDidFinishLaunching()
         director->setRenderView(renderView);
     }
 
+    renderView->setWindowSize(1280.0F, 720.0F);
     renderView->setDesignResolutionSize(1280.0F, 720.0F, ResolutionPolicy::SHOW_ALL);
     director->setAnimationInterval(1.0F / 30.0F);
     director->runWithScene(makeScene());

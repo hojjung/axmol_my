@@ -23,11 +23,13 @@ layout(std140, set = UNIFORM_SET, binding = VS_UB_BINDING) uniform vs_ub {
 
 vec2 transformTexCoord(vec2 texCoord)
 {
+    // glTF and KTX2 define (0, 0) at the logical upper-left. Texture upload
+    // preserves row order, so applying the legacy Axmol 3D V flip is incorrect.
     vec2 scaled = texCoord * u_stylizedUvTransform[0].zw;
     vec2 rotated = vec2(u_stylizedUvTransform[1].x * scaled.x - u_stylizedUvTransform[1].y * scaled.y,
                         u_stylizedUvTransform[1].y * scaled.x + u_stylizedUvTransform[1].x * scaled.y);
     vec2 transformed = u_stylizedUvTransform[0].xy + rotated;
-    return vec2(transformed.x, 1.0 - transformed.y);
+    return transformed;
 }
 
 vec3 transformInstanceNormal(vec3 normal)

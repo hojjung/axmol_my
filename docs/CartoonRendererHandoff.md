@@ -175,6 +175,17 @@ KTX2 transcode preference is ASTC 4x4, ETC2 RGBA, BC3, then RGBA8. Temporary
 decoded mip data is released after upload. Base color textures use sRGB-aware
 handling.
 
+glTF and KTX2 both define `(0, 0)` at the logical upper-left. The four
+stylized beauty/shadow, static/skinned vertex shaders apply
+`KHR_texture_transform` without the legacy Axmol 3D V flip. Keep all four
+variants identical: a beauty-only or shadow-only flip makes alpha silhouettes
+sample a different texel from the visible surface.
+
+Base color is decoded from an sRGB texture view and all lighting remains
+linear. Axmol's current swapchains and stylized intermediate use UNORM targets,
+so the beauty fragment performs one Linear-to-sRGB transfer. The three debug
+views remain raw linear masks for numeric acceptance checks.
+
 The vendored runtime boundaries are pinned to:
 
 - Basis Universal v2.1 at `58e3afbabae592e97e6a736e0908c03bc7a4dd4f`,
@@ -198,18 +209,93 @@ The pristine baseline is:
 B = 552,902 bytes
 ```
 
-The latest verified release build after formatting was:
+The latest verified non-manual release build after the Dragon and context
+restore fixes was:
 
 ```text
-WASM Brotli q11 = 519,020 bytes
-JS   Brotli q11 =  32,521 bytes
-Total            = 551,541 bytes
-Headroom         =   1,361 bytes
+WASM Brotli q11 = 519,261 bytes
+JS   Brotli q11 =  32,506 bytes
+Total            = 551,767 bytes
+Headroom         =   1,135 bytes
 ```
+
+This was a fresh Release configure with
+`AX_STYLIZED_SMOKE_CHARACTER_GLTF` empty. A binary and packed-asset scan found
+no Dragon/FBX/PSD/manual-content path or name. The manual Dragon validation
+build is deliberately not the product size artifact because its loader and DOM
+instrumentation raise the total to `562,168 bytes`.
 
 Do not update `AX_STYLIZED_WEB_BASELINE_BROTLI_BYTES` merely to make a failing
 change pass. Re-measure the pristine base with the same compiler and compression
 commands first.
+
+### 3.7 Dragon Fire browser proof caught two real rendering defects
+
+The licensed local validation asset was
+`Unit02/DragonFire/FBX/Dragon Fire@Fly Idle.FBX`; it must never be committed.
+`axasset` produced a self-contained meshopt/Basis GLB outside the repository,
+and `AX_STYLIZED_SMOKE_CHARACTER_GLTF` copied it only into an out-of-source
+manual build.
+
+The first browser run proved that resource binding alone is not visual
+correctness. Two defects were found and fixed from actual pixels:
+
+- linear lighting was written directly to a linear WebGL default framebuffer,
+  making the character nearly black; beauty output now performs the required
+  sRGB transfer while debug masks remain linear;
+- the stylized vertex shaders applied a legacy V flip to glTF/KTX2 upper-left
+  coordinates, so eyes, cream belly, and wing membranes sampled unrelated atlas
+  regions; beauty and alpha-shadow static/skinned variants now use the glTF
+  coordinates directly.
+
+The final WebGL2 run reported one mesh, 56 skeleton joints, a 1.0-second
+animation, a changed probe-bone pose, GLSL ES 3.00, and all smoke DOM flags at
+`1`. The canvas and client size were both exactly `1280x720`. Actual pixels
+showed the original orange/cream texture, two-band lighting, and directional
+shadow. The non-manual smoke scene retains the native-resolution cyan UI probe;
+the licensed manual visual scene hides that probe so it does not contaminate
+the reference capture. Two forced context
+loss/restore cycles then completed with `isContextLost == false`, four
+consecutive `glGetError() == 0` samples after each restore, and the ETC2 and
+ASTC compressed formats present after both cycles. There were no post-restore
+console/page errors or invalid native-object deletes.
+
+The reference-oriented manual camera uses a 42-degree perspective at
+`(0, 5.8, 8.2)`, looks at `(0, 2.15, 0)`, and normalizes the character to a
+`4.15`-unit maximum bind extent. The stable `Balanced` shadow tier is retained.
+The background clear color is matched to the lit ground output, producing one
+continuous lavender playfield without a horizon seam. An attempted 32x ground
+extension crossed the 50-unit camera far plane and produced clipped black
+regions after restore; that attempt was fully reverted rather than patched.
+The final ground remains 8x.
+
+The two final post-restore animation captures used the character ROI
+`x=430, y=50, width=500, height=500`. After a 370 ms interval, `87,814` of
+`250,000` ROI pixels changed and the average RGB PSNR was `15.462553 dB`,
+proving that the Fly Idle pose and moving directional shadow continued to
+update after the second restore. Expected
+`CONTEXT_LOST_WEBGL`/invalid-operation diagnostics may occur between the test's
+forced loss and delivery of the loss callback; acceptance is based on the
+post-restore samples and visible frame.
+
+Local-only evidence from the verified run was written to:
+
+```text
+/tmp/axmol-dragon-final-browser-before.png
+/tmp/axmol-dragon-final-browser-restored-1.png
+/tmp/axmol-dragon-final-browser-restored-2.png
+/tmp/axmol-dragon-final-restored-pose-a.png
+/tmp/axmol-dragon-final-restored-pose-b.png
+/tmp/axmol-dragon-final-latest-restored-2.png
+/tmp/axmol-dragon-latest-pose-a.png
+/tmp/axmol-dragon-latest-pose-b.png
+/tmp/axmol-dragon-reference-final-v3.png
+/tmp/axmol-dragon-reference-final-v3-pose-a.png
+/tmp/axmol-dragon-reference-final-v3-pose-b.png
+```
+
+The GLB, FBX, PSD, and screenshots are licensed/local evidence and are excluded
+from the repository.
 
 ## 4. Main implementation map
 
@@ -345,6 +431,32 @@ test. The expression now uses `Boolean($0)`, which remains valid under both
 C++ tokenization and JavaScript execution. If editing `EM_ASM`, always rebuild
 the Closure-enabled web target after formatting.
 
+### 6.5 WebGL restore order could recreate then leak program UBOs
+
+Cause: a program's UBO `BufferImpl` listeners were registered before the
+program listener at the same fixed priority. A restore first generated a new
+buffer, then program relinking deleted the UBO owner while the WebGL
+invalid-handle window deliberately suppressed native deletion. The newly
+generated buffer was therefore leaked on every restore.
+
+Fix: on WASM only, program relinking uses priority `-2`, after Director's
+already-registered shader-cache rebuild and before generic Buffer priority
+`-1`. Deleting the old UBO owner removes its pending listener, and replacement
+listeners created during dispatch are deferred. Native GL backends retain the
+existing `-1` ordering because they do not yet use WebGL's explicit
+invalid-handle phase; do not apply the WASM priority globally without an
+Android lifecycle gate.
+
+### 6.6 Inactive DrawNode geometry disappeared after restore
+
+Cause: the restore listener used scene-graph priority. A retained or pooled
+DrawNode outside the running scene is paused by the event dispatcher, while its
+dynamic GPU buffers are still recreated empty.
+
+Fix: DrawNode owns a fixed-priority listener for its full lifetime and marks
+triangle, point, and line streams dirty. The next draw uploads its retained CPU
+geometry whether the node was active or detached during restoration.
+
 ## 7. Verified results
 
 ### Native build and unit tests
@@ -353,10 +465,9 @@ the Closure-enabled web target after formatting.
 |---|---:|
 | OpenGL no-RHI full suite | 158/158 cases, 7,786 assertions |
 | Metal no-RHI full suite | 157/157 cases, 7,784 assertions |
-| OpenGL focused active RHI | 40/40 cases, 547 assertions |
-| Metal focused active RHI | 39/39 cases, 542 assertions |
-| OpenGL active RHI, Terrain excluded | 157/157 cases, 7,993 assertions |
-| Metal active RHI, Terrain excluded | 156/156 cases, 7,986 assertions |
+| OpenGL focused active RHI | 40/40 cases, 558 assertions |
+| Metal focused active RHI | 39/39 cases, 553 assertions |
+| Metal active RHI, Terrain excluded | 156/156 cases, 7,997 assertions |
 
 The shader matrix compiled:
 
@@ -386,31 +497,23 @@ mesh, one skin, one material, one image, and one texture.
 This branch is implemented and locally validated, but it is not yet eligible
 for a final cross-platform support claim.
 
-### 8.1 Final WebGL context-restore visual evidence is missing
+### 8.1 WebGL context restoration is locally verified, not browser-matrix certified
 
-The latest web build and server headers were valid, but the final browser
-automation attempted to call `getContext()` on a DOM proxy and stopped with:
+The Chromium WebGL2 smoke gate now passes two consecutive forced context
+loss/restore cycles. The implementation explicitly:
 
-```text
-TypeError: canvas.getContext is not a function
-```
+- marks handles from the lost context invalid so they are abandoned rather
+  than rebound or deleted in the restored context;
+- re-enables the context's supported WebGL extensions before rebuilding RHI
+  capabilities and selecting a KTX2 transcode target;
+- recreates the shared VAO, render targets, buffers, pipelines, retained
+  textures, shadow binding, and active or pooled dynamic DrawNode UI geometry;
+- releases transient callback and mesh-command GPU references before a later
+  context loss can keep stale resources alive.
 
-This was an automation-layer failure, not an observed engine exception.
-Nevertheless, do not claim that the final build passed context loss/restore
-until a fresh browser run proves all of the following after restoration:
-
-- WebGL2 version is reported;
-- `data-axmol-cross-origin-isolated="1"`;
-- `data-axmol-gltf-loaded="1"`;
-- `data-axmol-mesh-count` is at least 1;
-- `data-axmol-context-lost` is at least 1;
-- `data-axmol-context-restored` is at least 1;
-- no WebAssembly exception, abort, or GL error appears;
-- the character, ground, directional shadow, and native-resolution UI remain
-  visible several frames after restore.
-
-Prefer inspecting the existing DOM markers and taking a screenshot. Do not
-request a second WebGL context from an automation wrapper.
+This closes the local Chromium correctness gate. It does not replace the still
+outstanding Android Chrome, Samsung Internet, iOS Safari, desktop
+Firefox/Safari, and real-device lifecycle matrix in section 8.3.
 
 ### 8.2 Existing Terrain test assumption is exposed by active RHI
 
@@ -552,9 +655,10 @@ between threaded and non-threaded WebAssembly.
 The next session should work in this order and stop at the first failed gate
 rather than layering a workaround over it.
 
-1. Reproduce the latest WebGL release build from a fresh configure directory.
-2. Run the smoke page with real COOP/COEP headers and collect post-restore DOM,
-   console, and screenshot evidence.
+1. Reproduce the latest WebGL release build from a fresh configure directory
+   and keep the Brotli result at or below the pristine baseline.
+2. Repeat the two-cycle context restore smoke gate in Android Chrome, Samsung
+   Internet, iOS Safari, desktop Firefox, and desktop Safari.
 3. Fix the Terrain active-RHI test fixture, not production renderer behavior,
    then run the complete active-RHI suite without exclusions.
 4. Bring up Windows D3D11 and run the same depth comparison and stylized
