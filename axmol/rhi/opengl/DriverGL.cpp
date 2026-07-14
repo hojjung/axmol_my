@@ -41,6 +41,11 @@
 #include "axmol/tlx/format.hpp"
 #include "axmol/tlx/hash.hpp"
 
+#if AX_TARGET_PLATFORM == AX_PLATFORM_WASM
+#    include <cstdlib>
+#    include <emscripten/html5_webgl.h>
+#endif
+
 #if defined(GLAD_GL) || defined(GLAD_GLES2)
 #    define _AX_USE_GLAD 1
 #else
@@ -129,18 +134,38 @@ bool DriverImpl::init()
     }
 #endif
 
-    // caps
+    refreshContextCapabilities();
+
+    // default FBO
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &_defaultFBO);
+
+    // reset gl state
+    resetState();
+
+    // NOT GLES2.0, need generate shared VAO clearly
+    glGenVertexArrays(1, &_sharedVAO);
+    __state->bindVertexArray(_sharedVAO);
+
+    CHECK_GL_ERROR_DEBUG();
+
+    return true;
+}
+
+void DriverImpl::refreshContextCapabilities()
+{
     glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &_caps.maxAttributes);
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &_caps.maxTextureSize);
     glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &_caps.maxTextureUnits);
 
     // exts
+    _glExtensions.clear();
     GL_EnumAllExtensions([this](const std::string_view& ext) {
         const auto key = tlx::hash32_str(ext);
         _glExtensions.insert(key);
     });
 
     // texture compressions
+    _cap = {};
     tlx::pod_vector<GLint> formats;
     GLint numFormats{0};
     glGetIntegerv(GL_NUM_COMPRESSED_TEXTURE_FORMATS, &numFormats);
@@ -171,20 +196,61 @@ bool DriverImpl::init()
         glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &_cap.maxAnisotropy);
     }
 #endif
+}
 
-    // default FBO
+void DriverImpl::prepareContextRestore()
+{
+    OpenGLState::setNativeObjectsInvalidated(true);
+
+#if AX_TARGET_PLATFORM == AX_PLATFORM_WASM
+    const auto context = emscripten_webgl_get_current_context();
+    if (context > 0)
+    {
+        // WebGL disables extensions when the context is lost and does not
+        // restore them automatically. Re-enable the supported set before
+        // capabilities are queried or retained KTX2 images are transcoded.
+        if (char* supportedExtensions = emscripten_webgl_get_supported_extensions())
+        {
+            std::string_view remaining{supportedExtensions};
+            while (!remaining.empty())
+            {
+                const auto separator = remaining.find(' ');
+                const auto name      = remaining.substr(0, separator);
+                if (!name.empty())
+                {
+                    const std::string extension{name};
+                    emscripten_webgl_enable_extension(context, extension.c_str());
+                }
+                if (separator == std::string_view::npos)
+                    break;
+                remaining.remove_prefix(separator + 1);
+            }
+            std::free(supportedExtensions);
+        }
+    }
+#endif
+
+    refreshContextCapabilities();
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &_defaultFBO);
-
-    // reset gl state
     resetState();
 
-    // NOT GLES2.0, need generate shared VAO clearly
+    // The previous VAO belongs to the lost context and must be abandoned.
+    _sharedVAO = 0;
     glGenVertexArrays(1, &_sharedVAO);
     __state->bindVertexArray(_sharedVAO);
 
     CHECK_GL_ERROR_DEBUG();
+}
 
-    return true;
+void DriverImpl::beginContextLoss()
+{
+    OpenGLState::setNativeObjectsInvalidated(true);
+    _sharedVAO = 0;
+}
+
+void DriverImpl::completeContextRestore()
+{
+    OpenGLState::setNativeObjectsInvalidated(false);
 }
 
 GLint DriverImpl::getDefaultFBO() const

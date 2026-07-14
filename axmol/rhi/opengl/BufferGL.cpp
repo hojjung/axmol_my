@@ -85,7 +85,9 @@ void BufferImpl::reloadBuffer()
 {
     glGenBuffers(1, &_buffer);
 
-    if (!_needDefaultStoredData)
+    // A lazily allocated buffer has no storage to restore yet. Its first real
+    // update will allocate and, for static buffers, cache the backing data.
+    if (!_needDefaultStoredData || _bufferAllocated == 0)
         return;
 
     _bufferAlreadyFilled = true;

@@ -44,7 +44,21 @@ ProgramImpl::ProgramImpl(Data& vsData, Data& fsData) : Program(vsData, fsData)
 #if AX_ENABLE_CONTEXT_LOSS_RECOVERY
     _backToForegroundListener =
         CustomEventListener::create(EVENT_RENDERER_RECREATED, [this](CustomEvent*) { this->reloadProgram(); });
-    Director::getInstance()->getEventDispatcher()->addEventListenerWithFixedPriority(_backToForegroundListener, -1);
+#    if AX_TARGET_PLATFORM == AX_PLATFORM_WASM
+    // WebGL restore abandons every old native handle. Director's shader-cache
+    // listener was registered first at -2, so modules recompile before this
+    // program. Relinking at the same priority removes old UBO listeners before
+    // generic Buffer listeners (-1), while replacement listeners are deferred
+    // until the next event dispatch.
+    constexpr int restorePriority = -2;
+#    else
+    // Native GL restore paths historically rebuild Buffer handles before
+    // relinking their owner. Preserve that contract until those backends adopt
+    // WebGL's explicit invalid-handle phase.
+    constexpr int restorePriority = -1;
+#    endif
+    Director::getInstance()->getEventDispatcher()->addEventListenerWithFixedPriority(_backToForegroundListener,
+                                                                                     restorePriority);
 #endif
 }
 

@@ -36,6 +36,7 @@ THE SOFTWARE.
 #    include <sys/time.h>
 #    include <string>
 #    include "axmol/base/Director.h"
+#    include "axmol/base/Environment.h"
 #    include "axmol/base/Utils.h"
 #    include "axmol/platform/GL.h"
 #    include "axmol/platform/FileUtils.h"
@@ -45,6 +46,7 @@ THE SOFTWARE.
 #    include <array>
 #    include <emscripten/emscripten.h>
 #    include <emscripten/html5_webgl.h>
+#    include "axmol/rhi/opengl/DriverGL.h"
 #    if defined(AX_ENABLE_3D) && AX_ENABLE_3D
 #        include "axmol/3d/StylizedRenderer.h"
 #        include "axmol/scene/Scene.h"
@@ -180,6 +182,7 @@ EMSCRIPTEN_KEEPALIVE void axmol_webglcontextlost()
 {
     AXLOGI("receive event: webglcontextlost");
     s_webglContextLost = true;
+    static_cast<ax::rhi::gl::DriverImpl*>(axdrv)->beginContextLoss();
     s_gpuFrameTimer.abandon();
 }
 
@@ -189,7 +192,9 @@ EMSCRIPTEN_KEEPALIVE void axmol_webglcontextrestored()
     AXLOGI("receive event: webglcontextrestored");
 
     auto director = ax::Director::getInstance();
-    axdrv->resetState();
+    auto* glDriver = static_cast<ax::rhi::gl::DriverImpl*>(axdrv);
+    glDriver->prepareContextRestore();
+    ax::Environment::getInstance()->gatherGPUInfo();
     ax::CustomEvent recreatedEvent(EVENT_RENDERER_RECREATED);
     director->getEventDispatcher()->dispatchEvent(&recreatedEvent, true);
     director->setRenderDefaults();
@@ -197,6 +202,7 @@ EMSCRIPTEN_KEEPALIVE void axmol_webglcontextrestored()
     ax::VolatileTextureMgr::reloadAllTextures();
 #    endif
     s_gpuFrameTimer.initialize();
+    glDriver->completeContextRestore();
     s_webglContextLost = false;
 }
 

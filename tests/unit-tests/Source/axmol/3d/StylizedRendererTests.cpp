@@ -280,4 +280,24 @@ TEST_CASE("Shared stylized Pass restores command-local color lighting shadow tex
     REQUIRE(binding != programState->getTextureBindingSets().end());
     REQUIRE_FALSE(binding->second.texs.empty());
     CHECK(binding->second.texs.front() == textureA->getRHITexture());
+
+    programState->setTexture(textureLocation, 0, nullptr);
+    const auto clearedBinding = programState->getTextureBindingSets().find(textureLocation.location);
+    REQUIRE(clearedBinding != programState->getTextureBindingSets().end());
+    CHECK(clearedBinding->second.texs.empty());
+    CHECK(clearedBinding->second.slots.empty());
+
+    REQUIRE(material->setMainShadow(Mat4::identity, textureA->getRHITexture(), Vec2{1.0F / 1024.0F, 1.0F / 1024.0F},
+                                    0.001F, true));
+    const auto shadowLocation = programState->getUniformLocation("u_mainShadowMap");
+    const auto shadowBinding  = programState->getTextureBindingSets().find(shadowLocation.location);
+    REQUIRE(shadowBinding != programState->getTextureBindingSets().end());
+    REQUIRE_FALSE(shadowBinding->second.texs.empty());
+    CHECK(shadowBinding->second.texs.front() == textureA->getRHITexture());
+
+    REQUIRE(material->setMainShadow(Mat4::identity, nullptr, Vec2{1.0F / 1024.0F, 1.0F / 1024.0F}, 0.001F, false));
+    const auto clearedShadowBinding = programState->getTextureBindingSets().find(shadowLocation.location);
+    REQUIRE(clearedShadowBinding != programState->getTextureBindingSets().end());
+    CHECK(clearedShadowBinding->second.texs.empty());
+    CHECK(clearedShadowBinding->second.slots.empty());
 }

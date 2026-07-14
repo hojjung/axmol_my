@@ -342,10 +342,17 @@ void Renderer::processRenderCommand(RenderCommand* command)
         drawCustomCommand(command);
         break;
     case RenderCommand::Type::CALLBACK_COMMAND:
+    {
         flush();
-        static_cast<CallbackCommand*>(command)->execute();
-        _callbackCommandsPool.emplace_back(static_cast<CallbackCommand*>(command));
+        auto* callbackCommand = static_cast<CallbackCommand*>(command);
+        callbackCommand->execute();
+        // Callback captures commonly retain render targets. Release them as
+        // soon as the command has executed instead of carrying GPU resources
+        // into the next frame or across a context loss.
+        callbackCommand->func = nullptr;
+        _callbackCommandsPool.emplace_back(callbackCommand);
         break;
+    }
     default:
         assert(false);
         break;
@@ -772,7 +779,9 @@ void Renderer::drawCustomCommand(RenderCommand* command)
 void Renderer::drawMeshCommand(RenderCommand* command)
 {
     // MeshCommand and CustomCommand are identical while rendering.
-    drawCustomCommand(command);
+    auto* meshCommand = static_cast<MeshCommand*>(command);
+    drawCustomCommand(meshCommand);
+    meshCommand->clearProgramStateSnapshot();
 }
 
 void Renderer::flush()

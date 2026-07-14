@@ -203,7 +203,7 @@ public:
     /**
      * Set texture.
      * @param uniformLocation Specifies texture location.
-     * @param texture Specifies a pointer to backend texture.
+     * @param texture Specifies a pointer to backend texture. Passing nullptr clears the binding.
      */
     void setTexture(rhi::Texture* texture);
     void setTexture(const rhi::UniformLocation& uniformLocation, int slot, rhi::Texture* texture);

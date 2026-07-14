@@ -85,10 +85,15 @@ void TextureBindingSet::swap(TextureBindingSet& other)
 
 void TextureBindingSet::setTexture(int location, int slot, rhi::Texture* tex)
 {
-    if (tex && slot >= 0)
-    {
+    if (slot < 0)
+        return;
+
+    if (tex)
         tex->retain();
-        releaseTextures();
+
+    releaseTextures();
+    if (tex)
+    {
         this->runtimeLocation = location;
         this->slots.push_back(slot);
         this->texs.push_back(tex);

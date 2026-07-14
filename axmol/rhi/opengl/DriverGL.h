@@ -117,6 +117,13 @@ public:
 
     void resetState() override;
 
+    /** Mark all context-owned handles invalid as soon as WebGL reports a loss. */
+    void beginContextLoss();
+
+    /** Rebuild context-owned state without touching handles invalidated by WebGL context loss. */
+    void prepareContextRestore();
+    void completeContextRestore();
+
     /// below is driver info API
 
     /**
@@ -177,6 +184,8 @@ protected:
     GLuint _sharedVAO = 0;  // The shared VAO for all vertex layouts
 
 private:
+    void refreshContextCapabilities();
+
     std::set<uint32_t> _glExtensions;
 
     struct VersionInfo

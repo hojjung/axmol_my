@@ -58,6 +58,15 @@ RenderTargetImpl::~RenderTargetImpl()
         Director::getInstance()->getEventDispatcher()->removeEventListener(_rendererRecreatedListener);
 #endif
 
+        // WebGL invalidates every object created by the lost context. Those
+        // objects must be abandoned, never rebound or deleted in the restored
+        // context.
+        if (OpenGLState::areNativeObjectsInvalidated())
+        {
+            _FBO = 0;
+            return;
+        }
+
         bindFrameBuffer();
 
         for (auto slot = 0; slot < static_cast<int>(_color.size()); ++slot)

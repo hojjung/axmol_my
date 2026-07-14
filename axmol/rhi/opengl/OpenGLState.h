@@ -112,6 +112,9 @@ struct UniformBufferBaseBindState
 
 struct AX_DLL OpenGLState
 {
+    static void setNativeObjectsInvalidated(bool invalidated);
+    static bool areNativeObjectsInvalidated();
+
     constexpr static GLenum BufferTargets[] = {
         GL_ARRAY_BUFFER,          // VERTEX of VAO
         GL_ELEMENT_ARRAY_BUFFER,  // INDEX of VAO
@@ -267,7 +270,8 @@ struct AX_DLL OpenGLState
     }
     void deleteTexture(GLuint handle)
     {
-        glDeleteTextures(1, &handle);
+        if (!areNativeObjectsInvalidated())
+            glDeleteTextures(1, &handle);
 
         for (auto& textureBinding : _textureBindings)
         {
@@ -283,7 +287,8 @@ struct AX_DLL OpenGLState
     }
     void deleteSampler(GLuint handle)
     {
-        glDeleteSamplers(1, &handle);
+        if (!areNativeObjectsInvalidated())
+            glDeleteSamplers(1, &handle);
 
         for (auto& samplerBinding : _samplerBindings)
         {
@@ -307,7 +312,8 @@ struct AX_DLL OpenGLState
     }
     void deleteBuffer(BufferType type, GLuint buffer)
     {
-        glDeleteBuffers(1, &buffer);
+        if (!areNativeObjectsInvalidated())
+            glDeleteBuffers(1, &buffer);
         if (_bufferBindings[static_cast<int>(type)] == buffer)
             _bufferBindings[static_cast<int>(type)].reset();
     }
@@ -320,7 +326,8 @@ struct AX_DLL OpenGLState
 
     void deleteVertexArray(GLuint handle)
     {
-        glDeleteVertexArrays(1, &handle);
+        if (!areNativeObjectsInvalidated())
+            glDeleteVertexArrays(1, &handle);
         if (_vao == handle)
             _vao.reset();
     }

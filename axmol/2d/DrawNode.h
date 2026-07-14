@@ -44,6 +44,7 @@ namespace ax
 static const int DEFAULT_LINE_WIDTH = 2;
 
 class PointArray;
+class CustomEventListener;
 
 /**
  * @addtogroup _2d
@@ -584,6 +585,9 @@ protected:
 
     Vec2* _verticesCircle = nullptr;  // avoid cos/sin and frequently allocation when drawing circle and ellipse
     int _segments         = AX_DRAWNODE_PRE_CALCULATING_VERTICES;  // default segments used for circle and ellipse
+#if AX_ENABLE_CONTEXT_LOSS_RECOVERY
+    CustomEventListener* _rendererRecreatedListener = nullptr;
+#endif
 private:
     // Internal function _drawPoint
     void _drawPoint(const Vec2& position,

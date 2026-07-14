@@ -29,7 +29,10 @@
 #include <cmath>
 
 #include "axmol/3d/StylizedRenderer.h"
+#include "axmol/base/CustomEventListener.h"
 #include "axmol/base/Director.h"
+#include "axmol/base/EventDispatcher.h"
+#include "axmol/base/EventType.h"
 #include "axmol/base/Logging.h"
 #include "axmol/renderer/Pass.h"
 #include "axmol/renderer/ProgramManager.h"
@@ -76,6 +79,8 @@ StylizedMaterial* StylizedMaterial::create(const StylizedMaterialDesc& desc, boo
 
 StylizedMaterial::~StylizedMaterial()
 {
+    if (_rendererRecreatedListener)
+        Director::getInstance()->getEventDispatcher()->removeEventListener(_rendererRecreatedListener);
     AX_SAFE_RELEASE(_desc.baseTexture);
 }
 
@@ -122,6 +127,7 @@ bool StylizedMaterial::init(const StylizedMaterialDesc& desc, bool skinned)
 
     auto* texture = desc.baseTexture ? desc.baseTexture : Director::getInstance()->getTextureCache()->getWhiteTexture();
     setTexture(texture, NTextureData::Usage::Diffuse);
+    installContextRestoreListener();
 
     return true;
 }
@@ -164,6 +170,7 @@ Material* StylizedMaterial::clone() const
 
     const auto techniqueName    = _currentTechnique->getName();
     material->_currentTechnique = material->getTechniqueByName(techniqueName);
+    material->installContextRestoreListener();
     material->autorelease();
     return material;
 }
@@ -368,9 +375,28 @@ void StylizedMaterial::applyShadowUniforms()
         pass->setUniformShadowParams(&shadowParams, sizeof(shadowParams));
         const float enabled = _shadowEnabled ? 1.0F : 0.0F;
         pass->setUniformShadowEnabled(&enabled, sizeof(enabled));
-        if (_shadowMap)
-            pass->setUniformMainShadowMap(_shadowMap);
+        // nullptr is a real state transition: it releases the previous atlas
+        // binding so a disabled shadow cannot retain a stale context resource.
+        pass->setUniformMainShadowMap(_shadowMap);
     }
+}
+
+void StylizedMaterial::installContextRestoreListener()
+{
+#if AX_ENABLE_CONTEXT_LOSS_RECOVERY
+    if (_rendererRecreatedListener)
+        return;
+
+    _rendererRecreatedListener = CustomEventListener::create(EVENT_RENDERER_RECREATED, [this](CustomEvent*) {
+        // RenderTexture recreates its RHI texture after a context loss. Drop
+        // the old shadow binding while invalid native handles are being
+        // abandoned, then the renderer installs the new atlas next frame.
+        _shadowMap     = nullptr;
+        _shadowEnabled = false;
+        applyShadowUniforms();
+    });
+    Director::getInstance()->getEventDispatcher()->addEventListenerWithFixedPriority(_rendererRecreatedListener, -3);
+#endif
 }
 
 }  // namespace ax

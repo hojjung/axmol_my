@@ -36,6 +36,7 @@ class Texture2D;
 class Mesh;
 class MeshRenderer;
 class StylizedRenderer;
+class CustomEventListener;
 enum class StylizedDebugView : uint8_t;
 
 namespace rhi
@@ -59,6 +60,7 @@ struct AX_DLL StylizedMaterialDesc
     float rimIntensity     = 1.0F;
     float alphaCutoff      = 0.0F;
     bool doubleSided       = false;
+    /** glTF/KTX2 upper-left texture-coordinate convention. */
     Vec2 uvOffset{0.0F, 0.0F};
     Vec2 uvScale{1.0F, 1.0F};
     float uvRotation = 0.0F;
@@ -134,6 +136,7 @@ private:
     void applyShadowUniforms();
     void applyCullState();
     void setDebugView(StylizedDebugView debugView);
+    void installContextRestoreListener();
 
     StylizedMaterialDesc _desc{};
     std::array<Mat4, 2> _worldToShadowTexture{Mat4::identity, Mat4::identity};
@@ -148,6 +151,7 @@ private:
     bool _skinned               = false;
     uint8_t _maximumPointLights = 2;
     StylizedDebugView _debugView{};
+    CustomEventListener* _rendererRecreatedListener = nullptr;
 };
 
 }  // namespace ax

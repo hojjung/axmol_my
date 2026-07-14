@@ -98,20 +98,24 @@ DrawNode::DrawNode()
     }
 
 #if AX_ENABLE_CONTEXT_LOSS_RECOVERY
-    // TODO new-renderer: interface setupBuffer removal
-
-    // Need to listen the event only when not use batchnode, because it will use VBO
-    //    auto listener = CustomEventListener::create(EVENT_RENDERER_RECREATED, [this](CustomEvent* event){
-    //        /** listen the event that renderer was recreated on Android/WP8 */
-    //        this->setupBuffer();
-    //    });
-
-    //    _eventDispatcher->addEventListenerWithSceneGraphPriority(listener, this);
+    // Dynamic buffers do not retain a CPU copy in the RHI. Mark every stream
+    // dirty so the DrawNode-owned geometry is uploaded to the restored context.
+    // Fixed priority is required because retained/pooled nodes may not belong
+    // to the running scene when the context is restored.
+    _rendererRecreatedListener = CustomEventListener::create(EVENT_RENDERER_RECREATED, [this](CustomEvent*) {
+        _trianglesDirty = true;
+        _pointsDirty    = true;
+        _linesDirty     = true;
+    });
+    Director::getInstance()->getEventDispatcher()->addEventListenerWithFixedPriority(_rendererRecreatedListener, 1);
 #endif
 }
 
 DrawNode::~DrawNode()
 {
+#if AX_ENABLE_CONTEXT_LOSS_RECOVERY
+    Director::getInstance()->getEventDispatcher()->removeEventListener(_rendererRecreatedListener);
+#endif
     freeShaderInternal(_customCommandTriangle);
     freeShaderInternal(_customCommandPoint);
     freeShaderInternal(_customCommandLine);

@@ -148,7 +148,10 @@ MeshCommand::~MeshCommand()
 }
 
 #if AX_ENABLE_CONTEXT_LOSS_RECOVERY
-void MeshCommand::listenRendererRecreated(CustomEvent* event) {}
+void MeshCommand::listenRendererRecreated(CustomEvent*)
+{
+    clearProgramStateSnapshot();
+}
 #endif
 
 }  // namespace ax
