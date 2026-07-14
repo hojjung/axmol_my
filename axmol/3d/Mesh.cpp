@@ -28,6 +28,9 @@
 #include "axmol/3d/MeshSkin.h"
 #include "axmol/3d/Skeleton3D.h"
 #include "axmol/3d/MeshVertexIndexData.h"
+#include "axmol/3d/StylizedMaterial.h"
+#include "axmol/3d/StylizedQuality.h"
+#include "axmol/3d/StylizedRenderer.h"
 #include "axmol/3d/VertexInputBinding.h"
 #include "axmol/2d/Light.h"
 #include "axmol/scene/Scene.h"
@@ -39,10 +42,16 @@
 #include "axmol/renderer/Technique.h"
 #include "axmol/renderer/Pass.h"
 #include "axmol/renderer/Renderer.h"
+#include "axmol/renderer/ProgramManager.h"
 #include "axmol/rhi/Buffer.h"
 #include "axmol/rhi/Program.h"
 #include "axmol/renderer/RenderConsts.h"
 #include "axmol/math/Mat4.h"
+#include "axmol/scene/Camera.h"
+
+#include <array>
+#include <algorithm>
+#include <cmath>
 
 using namespace std;
 
@@ -97,6 +106,7 @@ Mesh::Mesh()
     , _visible(true)
     , _instancing(false)
     , _instanceTransformBuffer(nullptr)
+    , _instanceTransformDirty(false)
     , _instanceTransformBufferDirty(false)
     , _instanceCount(0)
     , _dynamicInstancing(false)
@@ -119,21 +129,34 @@ Mesh::~Mesh()
     AX_SAFE_RELEASE(_skin);
     AX_SAFE_RELEASE(_meshIndexData);
     AX_SAFE_RELEASE(_material);
+    AX_SAFE_RELEASE(_stylizedShadowMaterial);
     AX_SAFE_RELEASE(_instanceTransformBuffer);
     AX_SAFE_DELETE_ARRAY(_instanceMatrixCache);
 }
 
 void Mesh::enableInstancing(bool instance, int count)
 {
-    _instancing    = instance;
-    _instanceCount = count;
+    const int capacity = instance ? std::max(1, count) : 0;
+    if (_instancing == instance && _instanceCount == capacity)
+        return;
+
+    _instancing                   = instance;
+    _instanceCount                = capacity;
+    _instanceTransformDirty       = instance;
+    _instanceTransformBufferDirty = true;
 }
 
 void Mesh::setInstanceCount(int count)
 {
     AXASSERT(_instancing, "Instancing should be enabled on this mesh.");
 
-    _instanceCount = count;
+    const int capacity = std::max(1, count);
+    if (_instanceCount != capacity)
+    {
+        _instanceCount                = capacity;
+        _instanceTransformBufferDirty = true;
+        _instanceTransformDirty       = true;
+    }
 }
 
 void Mesh::addInstanceChild(Node* child)
@@ -144,7 +167,7 @@ void Mesh::addInstanceChild(Node* child)
 
     if (_instances.size() > _instanceCount)
     {
-        _instanceCount *= 2;
+        _instanceCount                = std::max(1, _instanceCount * 2);
         _instanceTransformBufferDirty = true;
     }
 }
@@ -165,7 +188,58 @@ void Mesh::rebuildInstances()
 
 void Mesh::setDynamicInstancing(bool dynamic)
 {
-    _dynamicInstancing = dynamic;
+    if (_dynamicInstancing == dynamic)
+        return;
+
+    _dynamicInstancing            = dynamic;
+    _instanceTransformBufferDirty = true;
+    _instanceTransformDirty       = true;
+}
+
+bool Mesh::prepareInstanceData(bool identityInstanceRequired)
+{
+    if (!_instancing && !identityInstanceRequired)
+        return true;
+    if (_instancing && _instances.empty())
+        return false;
+
+    const int capacity      = _instancing ? std::max(1, _instanceCount) : 1;
+    const size_t bufferSize = static_cast<size_t>(capacity) * sizeof(Mat4);
+    bool rebuilt            = false;
+    if (!_instanceTransformBuffer || _instanceTransformBufferDirty ||
+        _instanceTransformBuffer->getCapacity() < bufferSize)
+    {
+        AX_SAFE_RELEASE_NULL(_instanceTransformBuffer);
+        AX_SAFE_DELETE_ARRAY(_instanceMatrixCache);
+
+        const auto usage         = _dynamicInstancing ? rhi::BufferUsage::DYNAMIC : rhi::BufferUsage::STATIC;
+        _instanceTransformBuffer = axdrv->createBuffer(bufferSize, rhi::BufferType::VERTEX, usage);
+        if (!_instanceTransformBuffer)
+            return false;
+
+        _instanceMatrixCache = new float[static_cast<size_t>(capacity) * 16];
+        for (int index = 0; index < capacity; ++index)
+            std::copy_n(Mat4::identity.m, 16, _instanceMatrixCache + static_cast<size_t>(index) * 16);
+        _instanceTransformBuffer->updateData(_instanceMatrixCache, bufferSize);
+
+        _instanceTransformBufferDirty = false;
+        rebuilt                       = true;
+    }
+
+    if (_instancing && (rebuilt || _instanceTransformDirty || _dynamicInstancing))
+    {
+        size_t matrixOffset = 0;
+        for (const auto* instance : _instances)
+        {
+            const Mat4& matrix = instance->getNodeToParentTransform();
+            std::copy_n(matrix.m, 16, _instanceMatrixCache + matrixOffset * 16);
+            ++matrixOffset;
+        }
+        _instanceTransformBuffer->updateSubData(_instanceMatrixCache, 0, matrixOffset * sizeof(Mat4));
+        _instanceTransformDirty = false;
+    }
+
+    return true;
 }
 
 rhi::Buffer* Mesh::getVertexBuffer() const
@@ -402,8 +476,9 @@ void Mesh::setMaterial(Material* material)
                     // AXASSERT(vertexInputs.size() <= attributeCount, "missing attribute data");
                 }
 #endif
-                auto vertexInputBinding =
-                    VertexInputBinding::fetch(_meshIndexData, pass, &list[i], _instanceCount > 0 && _instancing);
+                const auto* stylizedMaterial  = dynamic_cast<const StylizedMaterial*>(_material);
+                const bool usesInstanceStream = stylizedMaterial ? !stylizedMaterial->isSkinned() : _instancing;
+                auto vertexInputBinding = VertexInputBinding::fetch(_meshIndexData, pass, &list[i], usesInstanceStream);
                 pass->setVertexInputBinding(vertexInputBinding);
                 i += 1;
             }
@@ -433,7 +508,8 @@ void Mesh::draw(Renderer* renderer,
                 unsigned int lightMask,
                 const Vec4& color,
                 bool forceDepthWrite,
-                bool wireframe)
+                bool wireframe,
+                Scene* ownerScene)
 {
     if (!isVisible())
         return;
@@ -443,57 +519,6 @@ void Mesh::draw(Renderer* renderer,
     if (isTransparent)
         flags |= Node::FLAGS_RENDER_AS_3D;
 
-    if (_instancing && _instanceCount > 0)
-    {
-        if (!_instanceTransformBuffer || _instanceTransformBufferDirty)
-        {
-            AX_SAFE_RELEASE(_instanceTransformBuffer);
-            AX_SAFE_DELETE_ARRAY(_instanceMatrixCache);
-
-            _instanceTransformBuffer =
-                axdrv->createBuffer(_instanceCount * 64, rhi::BufferType::VERTEX, rhi::BufferUsage::DYNAMIC);
-
-            _instanceMatrixCache = new float[_instanceCount * 16];
-            for (int i = 0; i < _instanceCount; i++)
-            {
-                _instanceMatrixCache[i * 16 + 0]  = 1.0f;
-                _instanceMatrixCache[i * 16 + 1]  = 0.0f;
-                _instanceMatrixCache[i * 16 + 2]  = 0.0f;
-                _instanceMatrixCache[i * 16 + 3]  = 0.0f;
-                _instanceMatrixCache[i * 16 + 4]  = 0.0f;
-                _instanceMatrixCache[i * 16 + 5]  = 1.0f;
-                _instanceMatrixCache[i * 16 + 6]  = 0.0f;
-                _instanceMatrixCache[i * 16 + 7]  = 0.0f;
-                _instanceMatrixCache[i * 16 + 8]  = 0.0f;
-                _instanceMatrixCache[i * 16 + 9]  = 0.0f;
-                _instanceMatrixCache[i * 16 + 10] = 1.0f;
-                _instanceMatrixCache[i * 16 + 11] = 0.0f;
-                _instanceMatrixCache[i * 16 + 12] = 0.0f;
-                _instanceMatrixCache[i * 16 + 13] = 0.0f;
-                _instanceMatrixCache[i * 16 + 14] = 0.0f;
-                _instanceMatrixCache[i * 16 + 15] = 1.0f;
-            }
-
-            // Fill the buffer with identity matrix.
-            _instanceTransformBuffer->updateData(_instanceMatrixCache, _instanceCount * 64);
-
-            _instanceTransformBufferDirty = false;
-        }
-
-        if (_instanceTransformDirty || _dynamicInstancing)
-        {
-            _instanceTransformDirty = false;
-
-            int memOffset = 0;
-            for (auto& _ : _instances)
-            {
-                auto& mat = _->getNodeToParentTransform();
-                std::copy(mat.m, mat.m + 16, _instanceMatrixCache + 16 * memOffset++);
-            }
-            _instanceTransformBuffer->updateSubData(_instanceMatrixCache, 0, _instanceCount * 64);
-        }
-    }
-
     if (isTransparent && !forceDepthWrite)
         _material->getStateBlock().setDepthWrite(false);
     else
@@ -501,16 +526,29 @@ void Mesh::draw(Renderer* renderer,
 
     // set default uniforms for Mesh
     // 'u_color' and others
-    const auto scene = Director::getInstance()->getRunningScene();
-    auto technique   = _material->_currentTechnique;
+    const auto scene              = ownerScene ? ownerScene : Director::getInstance()->getRunningScene();
+    auto technique                = _material->_currentTechnique;
+    auto* stylizedMaterial        = dynamic_cast<StylizedMaterial*>(_material);
+    const bool usesInstanceStream = stylizedMaterial ? !_skin : _instancing;
+    if (usesInstanceStream && !prepareInstanceData(stylizedMaterial && !_instancing))
+        return;
     for (const auto pass : technique->_passes)
     {
+        if (const auto diffuse = _textures.find(NTextureData::Usage::Diffuse); diffuse != _textures.end())
+            pass->setUniformTexture(0, diffuse->second->getRHITexture());
+        if (const auto normal = _textures.find(NTextureData::Usage::Normal); normal != _textures.end())
+            pass->setUniformNormTexture(1, normal->second->getRHITexture());
+
         pass->setUniformColor(&color, sizeof(color));
 
         if (_skin)
             pass->setUniformMatrixPalette(_skin->getMatrixPalette(), _skin->getMatrixPaletteSizeInBytes());
 
-        if (scene && !scene->getLights().empty())
+        if (stylizedMaterial)
+        {
+            setStylizedLightUniforms(pass, scene, *stylizedMaterial, lightMask, transform);
+        }
+        else if (scene && !scene->getLights().empty())
         {
             setLightUniforms(pass, scene, color, lightMask);
         }
@@ -524,21 +562,136 @@ void Mesh::draw(Renderer* renderer,
         command.setTransparent(isTransparent);
         command.set3D(!_material->isForce2DQueue());
         command.setWireframe(wireframe);
-        if (_instancing)
+        if (usesInstanceStream)
         {
-            if (_instances.size() > 0)
-            {
-                command.setDrawType(CustomCommand::DrawType::ELEMENT_INSTANCED);
-                command.setInstanceBuffer(_instanceTransformBuffer, static_cast<int>(_instances.size()));
-            }
-            else
-                return;
+            const int drawCount = _instancing ? static_cast<int>(_instances.size()) : 1;
+            command.setDrawType(CustomCommand::DrawType::ELEMENT_INSTANCED);
+            command.setInstanceBuffer(_instanceTransformBuffer, drawCount);
+        }
+        else
+        {
+            command.setDrawType(CustomCommand::DrawType::ELEMENT);
+            command.setInstanceBuffer(nullptr, 0);
         }
     }
 
     _meshIndexData->setPrimitiveType(_material->_drawPrimitive);
     _material->draw(commands.data(), globalZ, getVertexBuffer(), getIndexBuffer(), getPrimitiveType(), getIndexFormat(),
                     static_cast<unsigned int>(getIndexCount()), transform);
+}
+
+bool Mesh::ensureStylizedShadowMaterial(const StylizedMaterial& sourceMaterial, uint64_t resourceGeneration)
+{
+    const uint32_t programType = sourceMaterial.getShadowProgramType();
+    if (_stylizedShadowMaterial && _stylizedShadowProgramType == programType &&
+        _stylizedShadowGeneration == resourceGeneration)
+    {
+        _stylizedShadowMaterial->getStateBlock().setCullFace(!sourceMaterial._desc.doubleSided);
+        return true;
+    }
+
+    AX_SAFE_RELEASE_NULL(_stylizedShadowMaterial);
+    auto* program = axpm->getBuiltinProgram(programType);
+    if (!program)
+        return false;
+
+    auto* programState = new rhi::ProgramState(program);
+    auto* material     = Material::createWithProgramState(programState);
+    programState->release();
+    if (!material)
+        return false;
+
+    material->retain();
+    material->getStateBlock().setDepthTest(true);
+    material->getStateBlock().setDepthWrite(true);
+    material->getStateBlock().setCullFace(!sourceMaterial._desc.doubleSided);
+    material->getStateBlock().setCullFaceSide(CullFaceSide::BACK);
+
+    auto* pass    = material->getTechnique()->getPassByIndex(0);
+    auto* binding = VertexInputBinding::fetch(_meshIndexData, pass, &_stylizedShadowCommands[0], !_skin);
+    pass->setVertexInputBinding(binding);
+
+    _stylizedShadowMaterial    = material;
+    _stylizedShadowProgramType = programType;
+    _stylizedShadowGeneration  = resourceGeneration;
+    return true;
+}
+
+void Mesh::drawStylizedShadow(Renderer& renderer,
+                              const StylizedMaterial& sourceMaterial,
+                              const std::array<int, 2>& cascadeQueueIds,
+                              const std::array<Mat4, 2>& lightViewProjection,
+                              uint8_t cascadeCount,
+                              const Mat4& transform,
+                              const Vec4& color,
+                              uint64_t resourceGeneration)
+{
+    if (!isVisible() || cascadeCount == 0 || !ensureStylizedShadowMaterial(sourceMaterial, resourceGeneration))
+        return;
+
+    const bool usesInstanceStream = !_skin;
+    if (usesInstanceStream && !prepareInstanceData(!_instancing))
+        return;
+
+    auto* pass        = _stylizedShadowMaterial->getTechnique()->getPassByIndex(0);
+    const auto toVec4 = [](const Color& value) { return Vec4{value.r, value.g, value.b, value.a}; };
+    const std::array<Vec4, 7> materialValues = {
+        toVec4(sourceMaterial._desc.baseColor),
+        toVec4(sourceMaterial._desc.highlightColor),
+        toVec4(sourceMaterial._desc.shadowColor),
+        toVec4(sourceMaterial._desc.diffuseTint),
+        toVec4(sourceMaterial._desc.rimColor),
+        Vec4{sourceMaterial._desc.bandThreshold, sourceMaterial._desc.bandSoftness, sourceMaterial._desc.rimStart,
+             sourceMaterial._desc.rimEnd},
+        Vec4{sourceMaterial._desc.rimIntensity, sourceMaterial._desc.alphaCutoff, 0.0F, 0.0F},
+    };
+    pass->setUniformStylizedMaterial(materialValues.data(), sizeof(materialValues));
+    const float uvCosine                  = std::cos(sourceMaterial._desc.uvRotation);
+    const float uvSine                    = std::sin(sourceMaterial._desc.uvRotation);
+    const std::array<Vec4, 2> uvTransform = {
+        Vec4{sourceMaterial._desc.uvOffset.x, sourceMaterial._desc.uvOffset.y, sourceMaterial._desc.uvScale.x,
+             sourceMaterial._desc.uvScale.y},
+        Vec4{uvCosine, uvSine, 0.0F, 0.0F},
+    };
+    pass->setUniformStylizedUvTransform(uvTransform.data(), sizeof(uvTransform));
+    pass->setUniformColor(&color, sizeof(color));
+    if (_skin)
+        pass->setUniformMatrixPalette(_skin->getMatrixPalette(), _skin->getMatrixPaletteSizeInBytes());
+
+    Texture2D* texture = sourceMaterial._desc.baseTexture;
+    if (auto textureIt = _textures.find(NTextureData::Usage::Diffuse); textureIt != _textures.end())
+        texture = textureIt->second;
+    if (!texture)
+        texture = Director::getInstance()->getTextureCache()->getWhiteTexture();
+    pass->setUniformTexture(0, texture->getRHITexture());
+
+    for (uint8_t cascade = 0; cascade < std::min<uint8_t>(cascadeCount, 2); ++cascade)
+    {
+        if (cascadeQueueIds[cascade] < 0)
+            continue;
+        auto& command = _stylizedShadowCommands[cascade];
+        if (usesInstanceStream)
+        {
+            const int drawCount = _instancing ? static_cast<int>(_instances.size()) : 1;
+            command.setDrawType(CustomCommand::DrawType::ELEMENT_INSTANCED);
+            command.setInstanceBuffer(_instanceTransformBuffer, drawCount);
+        }
+        else
+        {
+            command.setDrawType(CustomCommand::DrawType::ELEMENT);
+            command.setInstanceBuffer(nullptr, 0);
+        }
+        renderer.pushGroup(cascadeQueueIds[cascade]);
+        _stylizedShadowMaterial->draw(&command, 0.0F, getVertexBuffer(), getIndexBuffer(), getPrimitiveType(),
+                                      getIndexFormat(), static_cast<unsigned int>(getIndexCount()), transform);
+        renderer.popGroup();
+
+        command.setTransparent(false);
+        command.set3D(true);
+        command.setWireframe(false);
+        command.setSkipBatching(false);
+        command.setViewProjectionOverride(lightViewProjection[cascade]);
+    }
 }
 
 void Mesh::setSkin(MeshSkin* skin)
@@ -623,7 +776,10 @@ void Mesh::bindMeshCommand()
     if (_material && _meshIndexData)
     {
         auto& stateBlock = _material->getStateBlock();
-        stateBlock.setCullFace(true);
+        if (const auto* stylized = dynamic_cast<const StylizedMaterial*>(_material))
+            stateBlock.setCullFace(!stylized->_desc.doubleSided);
+        else
+            stateBlock.setCullFace(true);
         stateBlock.setDepthTest(true);
         if (_blend.src != rhi::BlendFactor::ONE && _blend.dst != rhi::BlendFactor::ONE)
             stateBlock.setBlend(true);
@@ -796,6 +952,168 @@ void Mesh::setLightUniforms(Pass* pass, Scene* scene, const Vec4& color, unsigne
             pass->setUniformColor(&fcolor, sizeof(fcolor));
         }
     }
+}
+
+void Mesh::setStylizedLightUniforms(Pass* pass,
+                                    Scene* scene,
+                                    const StylizedMaterial& material,
+                                    unsigned int lightmask,
+                                    const Mat4& transform)
+{
+    AXASSERT(pass, "Invalid Pass");
+
+    struct PointCandidate
+    {
+        float score = 0.0F;
+        Vec4 positionAndInverseRange{};
+        Vec4 color{};
+    };
+
+    std::array<Vec4, 9> lightData{};
+    lightData[0].set(0.0F, -1.0F, 0.0F, 0.0F);
+
+    if (const auto* camera = Camera::getVisitingCamera())
+    {
+        const auto cameraTransform = camera->getNodeToWorldTransform();
+        lightData[3].set(cameraTransform.m[12], cameraTransform.m[13], cameraTransform.m[14], 1.0F);
+        Vec3 cameraForward;
+        cameraTransform.getForwardVector(&cameraForward);
+        if (cameraForward.lengthSquared() > 1.0e-8F)
+            cameraForward.normalize();
+        else
+            cameraForward.set(0.0F, 0.0F, -1.0F);
+        lightData[4].set(cameraForward.x, cameraForward.y, cameraForward.z, 0.0F);
+    }
+    else
+    {
+        lightData[3].set(transform.m[12], transform.m[13], transform.m[14] + 1.0F, 1.0F);
+        lightData[4].set(0.0F, 0.0F, -1.0F, 0.0F);
+    }
+
+    if (!scene)
+    {
+        pass->setUniformStylizedLighting(lightData.data(), sizeof(lightData));
+        return;
+    }
+
+    std::array<PointCandidate, 2> pointCandidates{};
+    const Vec3 objectPosition{transform.m[12], transform.m[13], transform.m[14]};
+    const auto* stylizedRenderer = StylizedRenderer::get(*scene);
+    if (stylizedRenderer &&
+        stylizedRenderer->fillStylizedLightData(lightData, lightmask, objectPosition, material.getMaximumPointLights()))
+    {
+        pass->setUniformStylizedLighting(lightData.data(), sizeof(lightData));
+        return;
+    }
+
+    const auto linearChannel = [](uint8_t channel) {
+        const float value = static_cast<float>(channel) * (1.0F / 255.0F);
+        return value <= 0.04045F ? value * (1.0F / 12.92F) : std::pow((value + 0.055F) * (1.0F / 1.055F), 2.4F);
+    };
+    const auto linearColor = [&linearChannel](const BaseLight& light) {
+        const Color32& color  = light.getDisplayedColor();
+        const float intensity = light.getIntensity();
+        return Vec3{linearChannel(color.r) * intensity, linearChannel(color.g) * intensity,
+                    linearChannel(color.b) * intensity};
+    };
+    DirectionLight* selectedMainLight = stylizedRenderer ? stylizedRenderer->resolveMainLight(lightmask) : nullptr;
+
+    if (!selectedMainLight)
+    {
+        for (auto* light : scene->getLights())
+        {
+            if (light->getLightType() == LightType::DIRECTIONAL && light->isEnabled() &&
+                (static_cast<unsigned int>(light->getLightFlag()) & lightmask) != 0U)
+            {
+                selectedMainLight = static_cast<DirectionLight*>(light);
+                break;
+            }
+        }
+    }
+
+    if (selectedMainLight)
+    {
+        Vec3 direction = selectedMainLight->getDirectionInWorld();
+        direction.normalize();
+        const Vec3 color = linearColor(*selectedMainLight);
+        lightData[0].set(direction.x, direction.y, direction.z, 1.0F);
+        lightData[1].set(color.x, color.y, color.z, 1.0F);
+    }
+
+    for (auto* light : scene->getLights())
+    {
+        if (!light->isEnabled() || !(static_cast<unsigned int>(light->getLightFlag()) & lightmask))
+            continue;
+
+        const Vec3 color = linearColor(*light);
+
+        switch (light->getLightType())
+        {
+        case LightType::DIRECTIONAL:
+            if (light == selectedMainLight)
+            {
+                auto* directional = static_cast<DirectionLight*>(light);
+                Vec3 direction    = directional->getDirectionInWorld();
+                direction.normalize();
+                lightData[0].set(direction.x, direction.y, direction.z, 1.0F);
+                lightData[1].set(color.x, color.y, color.z, 1.0F);
+            }
+            break;
+
+        case LightType::AMBIENT:
+            lightData[2].x += color.x;
+            lightData[2].y += color.y;
+            lightData[2].z += color.z;
+            break;
+
+        case LightType::POINT:
+        {
+            if (material.getMaximumPointLights() == 0)
+                break;
+
+            auto* point       = static_cast<PointLight*>(light);
+            const float range = point->getRange();
+            if (range <= 0.0F)
+                break;
+
+            const auto pointTransform = point->getNodeToWorldTransform();
+            const Vec3 pointPosition{pointTransform.m[12], pointTransform.m[13], pointTransform.m[14]};
+            const Vec3 toLight                    = pointPosition - objectPosition;
+            const float normalizedDistanceSquared = toLight.lengthSquared() / (range * range);
+            if (normalizedDistanceSquared >= 1.0F)
+                break;
+
+            const float attenuation = 1.0F - normalizedDistanceSquared;
+            const float luminance   = color.x * 0.2126F + color.y * 0.7152F + color.z * 0.0722F;
+            PointCandidate candidate;
+            candidate.score = luminance * attenuation * attenuation;
+            candidate.positionAndInverseRange.set(pointPosition.x, pointPosition.y, pointPosition.z, 1.0F / range);
+            candidate.color.set(color.x, color.y, color.z, 1.0F);
+
+            for (auto& selected : pointCandidates)
+            {
+                if (candidate.score > selected.score)
+                    std::swap(candidate, selected);
+            }
+            break;
+        }
+
+        default:
+            break;
+        }
+    }
+
+    const uint8_t maximumPointLights =
+        stylizedRenderer ? std::min<uint8_t>(material.getMaximumPointLights(),
+                                             stylizedRenderer->getResolvedQuality().maximumPointLights)
+                         : material.getMaximumPointLights();
+    for (uint8_t index = 0; index < maximumPointLights; ++index)
+    {
+        lightData[5 + index * 2] = pointCandidates[index].positionAndInverseRange;
+        lightData[6 + index * 2] = pointCandidates[index].color;
+    }
+
+    pass->setUniformStylizedLighting(lightData.data(), sizeof(lightData));
 }
 
 void Mesh::setBlendFunc(const BlendFunc& blendFunc)

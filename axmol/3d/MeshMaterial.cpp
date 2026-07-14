@@ -26,6 +26,7 @@
 
 #include "axmol/3d/MeshMaterial.h"
 #include "axmol/3d/Mesh.h"
+#include "axmol/3d/StylizedMaterial.h"
 #include "axmol/platform/FileUtils.h"
 #include "axmol/renderer/Texture2D.h"
 #include "axmol/base/Director.h"
@@ -271,6 +272,9 @@ MeshMaterial* MeshMaterial::createBuiltInMaterial(MaterialType type, bool skinne
     case MeshMaterial::MaterialType::BUMPED_DIFFUSE:
         material = skinned ? _bumpedDiffuseMaterialSkin : _bumpedDiffuseMaterial;
         break;
+
+    case MeshMaterial::MaterialType::STYLIZED:
+        return StylizedMaterial::create({}, skinned);
 
     case MeshMaterial::MaterialType::QUAD_TEXTURE:
         material = _quadTextureMaterial;

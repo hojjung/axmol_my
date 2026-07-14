@@ -178,6 +178,16 @@ void Pass::initUniformLocations()
     _locSpotLightRangeInverse  = ps->getUniformLocation(s_spotLightUniformRangeInverseName);
 
     _locAmbientLigthColor = ps->getUniformLocation(s_ambientLightUniformColorName);
+
+    _locStylizedMaterial    = ps->getUniformLocation("u_stylizedMaterial");
+    _locStylizedUvTransform = ps->getUniformLocation("u_stylizedUvTransform");
+    _locStylizedLighting    = ps->getUniformLocation("u_stylizedLightData");
+    _locMainShadowMatrix    = ps->getUniformLocation("u_mainShadowMatrix");
+    _locShadowTexelSize     = ps->getUniformLocation("u_shadowTexelSize");
+    _locShadowBias          = ps->getUniformLocation("u_shadowBias");
+    _locShadowEnabled       = ps->getUniformLocation("u_shadowEnabled");
+    _locShadowParams        = ps->getUniformLocation("u_shadowParams");
+    _locMainShadowMap       = ps->getUniformLocation("u_mainShadowMap");
 }
 
 void Pass::draw(MeshCommand* meshCommand,
@@ -189,7 +199,6 @@ void Pass::draw(MeshCommand* meshCommand,
                 unsigned int indexCount,
                 const Mat4& modelView)
 {
-
     meshCommand->setBeforeCallback(AX_CALLBACK_0(Pass::onBeforeVisitCmd, this, meshCommand));
     meshCommand->setAfterCallback(AX_CALLBACK_0(Pass::onAfterVisitCmd, this, meshCommand));
     meshCommand->init(globalZOrder, modelView);
@@ -198,15 +207,24 @@ void Pass::draw(MeshCommand* meshCommand,
     meshCommand->setVertexBuffer(vertexBuffer);
     meshCommand->setIndexDrawInfo(0, indexCount);
     meshCommand->setWeakPSVL(_programState, _vertexLayout);
+    if (_locStylizedMaterial || _locStylizedLighting)
+    {
+        const bool captured = meshCommand->captureProgramState(*_programState);
+        AXASSERT(captured, "Stylized ProgramState exceeds the command-local texture snapshot budget");
+    }
+    else
+    {
+        meshCommand->clearProgramStateSnapshot();
+    }
 
     auto* renderer = Director::getInstance()->getRenderer();
 
     renderer->addCommand(meshCommand);
 }
 
-void Pass::updateMVPUniform(const Mat4& modelView)
+void Pass::updateMVPUniform(const Mat4& modelView, const Mat4* viewProjectionOverride)
 {
-    const auto& matrixP = Camera::getVisitingViewProjectionMatrix();
+    const auto& matrixP = viewProjectionOverride ? *viewProjectionOverride : Camera::getVisitingViewProjectionMatrix();
     auto mvp            = matrixP * modelView;
     _programState->setUniform(_locMVPMatrix, mvp.m, sizeof(mvp.m));
     if (_locMVMatrix)
@@ -239,7 +257,12 @@ void Pass::onBeforeVisitCmd(MeshCommand* command)
     // apply state blocks
     _renderState.bindPass(this, command);
 
-    updateMVPUniform(command->getMV());
+    if (command->hasProgramStateSnapshot())
+    {
+        const bool restored = command->restoreProgramState(*_programState);
+        AXASSERT(restored, "MeshCommand ProgramState snapshot no longer matches its Pass");
+    }
+    updateMVPUniform(command->getMV(), command->getViewProjectionOverride());
 }
 
 void Pass::onAfterVisitCmd(MeshCommand* command)
@@ -365,6 +388,52 @@ void Pass::setUniformSpotLightRangeInverse(const void* data, size_t dataLen)
 void Pass::setUniformAmbientLigthColor(const void* data, size_t dataLen)
 {
     TRY_SET_UNIFORM(_locAmbientLigthColor);
+}
+
+void Pass::setUniformStylizedMaterial(const void* data, size_t dataLen)
+{
+    TRY_SET_UNIFORM(_locStylizedMaterial);
+}
+
+void Pass::setUniformStylizedUvTransform(const void* data, size_t dataLen)
+{
+    TRY_SET_UNIFORM(_locStylizedUvTransform);
+}
+
+void Pass::setUniformStylizedLighting(const void* data, size_t dataLen)
+{
+    TRY_SET_UNIFORM(_locStylizedLighting);
+}
+
+void Pass::setUniformMainShadowMatrix(const void* data, size_t dataLen)
+{
+    TRY_SET_UNIFORM(_locMainShadowMatrix);
+}
+
+void Pass::setUniformShadowTexelSize(const void* data, size_t dataLen)
+{
+    TRY_SET_UNIFORM(_locShadowTexelSize);
+}
+
+void Pass::setUniformShadowBias(const void* data, size_t dataLen)
+{
+    TRY_SET_UNIFORM(_locShadowBias);
+}
+
+void Pass::setUniformShadowEnabled(const void* data, size_t dataLen)
+{
+    TRY_SET_UNIFORM(_locShadowEnabled);
+}
+
+void Pass::setUniformShadowParams(const void* data, size_t dataLen)
+{
+    TRY_SET_UNIFORM(_locShadowParams);
+}
+
+void Pass::setUniformMainShadowMap(rhi::Texture* texture)
+{
+    if (_locMainShadowMap)
+        _programState->setTexture(_locMainShadowMap, 1, texture);
 }
 
 }  // namespace ax

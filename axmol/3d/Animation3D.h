@@ -74,6 +74,8 @@ public:
     /**get duration*/
     float getDuration() const { return _duration; }
 
+    bool usesAbsoluteLocalTransforms() const { return _usesAbsoluteLocalTransforms; }
+
     /**
      * get bone curve
      *
@@ -96,6 +98,7 @@ protected:
     tlx::string_map<Curve*> _boneCurves;  // bone curves map, key bone name, value AnimationCurve
 
     float _duration;  // animation duration
+    bool _usesAbsoluteLocalTransforms;
 };
 
 /**

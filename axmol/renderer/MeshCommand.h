@@ -26,10 +26,14 @@
 
 #pragma once
 
+#include <array>
 #include <unordered_map>
+#include <vector>
+#include "axmol/base/RefPtr.h"
 #include "axmol/renderer/RenderCommand.h"
 #include "axmol/renderer/RenderState.h"
 #include "axmol/rhi/ProgramState.h"
+#include "axmol/rhi/Texture.h"
 #include "axmol/renderer/CustomCommand.h"
 #include "axmol/math/Math.h"
 
@@ -73,11 +77,46 @@ public:
 
     void init(float globalZOrder, const Mat4& transform);
 
+    void setViewProjectionOverride(const Mat4& viewProjection)
+    {
+        _viewProjectionOverride    = viewProjection;
+        _hasViewProjectionOverride = true;
+    }
+    [[nodiscard]] const Mat4* getViewProjectionOverride() const noexcept
+    {
+        return _hasViewProjectionOverride ? &_viewProjectionOverride : nullptr;
+    }
+
+    /**
+     * Captures mutable ProgramState data at submission time. Stylized meshes
+     * share Pass objects, so the renderer restores this copy immediately
+     * before executing the command.
+     */
+    bool captureProgramState(const rhi::ProgramState& programState);
+    bool restoreProgramState(rhi::ProgramState& programState) const;
+    void clearProgramStateSnapshot() noexcept;
+    [[nodiscard]] bool hasProgramStateSnapshot() const noexcept { return _hasProgramStateSnapshot; }
+
 #if AX_ENABLE_CONTEXT_LOSS_RECOVERY
     void listenRendererRecreated(CustomEvent* event);
 #endif
 
 protected:
+    struct TextureBindingSnapshot
+    {
+        rhi::UniformLocation location{};
+        int slot = -1;
+        RefPtr<rhi::Texture> texture;
+    };
+
+    static constexpr size_t MAX_SNAPSHOT_TEXTURE_BINDINGS = 4;
+
+    Mat4 _viewProjectionOverride    = Mat4::identity;
+    bool _hasViewProjectionOverride = false;
+    std::vector<uint8_t> _uniformSnapshot;
+    std::array<TextureBindingSnapshot, MAX_SNAPSHOT_TEXTURE_BINDINGS> _textureSnapshot{};
+    uint8_t _textureSnapshotCount = 0;
+    bool _hasProgramStateSnapshot = false;
 #if AX_ENABLE_CONTEXT_LOSS_RECOVERY
     CustomEventListener* _rendererRecreatedListener;
 #endif

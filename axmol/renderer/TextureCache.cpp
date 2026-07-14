@@ -599,7 +599,42 @@ Texture2D* TextureCache::addImage(Image* image, std::string_view key, PixelForma
 
 Texture2D* TextureCache::addImage(const Data& imageData, std::string_view key)
 {
+    if (auto it = _textures.find(key); it != _textures.end())
+        return it->second;
+
+#if AX_ENABLE_CONTEXT_LOSS_RECOVERY
+    return addImage(std::make_shared<const Data>(imageData), key);
+#else
+    return addImageInternal(imageData, key, nullptr);
+#endif
+}
+
+Texture2D* TextureCache::addImage(const std::shared_ptr<const Data>& imageData, std::string_view key)
+{
+    AXASSERT(imageData, "TextureCache: shared imageData MUST not be null");
+    if (!imageData)
+        return nullptr;
+    return addImageInternal(*imageData, key, imageData);
+}
+
+Texture2D* TextureCache::addImage(const std::shared_ptr<const Data>& imageData,
+                                  std::string_view key,
+                                  rhi::ColorSpace colorSpace)
+{
+    AXASSERT(imageData, "TextureCache: shared imageData MUST not be null");
+    if (!imageData)
+        return nullptr;
+    return addImageInternal(*imageData, key, imageData, &colorSpace);
+}
+
+Texture2D* TextureCache::addImageInternal(const Data& imageData,
+                                          std::string_view key,
+                                          const std::shared_ptr<const Data>& retainedSource,
+                                          const rhi::ColorSpace* colorSpaceOverride)
+{
     AXASSERT(!imageData.isNull() && !key.empty(), "TextureCache: imageData MUST not be empty and key not empty");
+    if (imageData.isNull() || key.empty())
+        return nullptr;
 
     Texture2D* texture = nullptr;
 
@@ -612,21 +647,24 @@ Texture2D* TextureCache::addImage(const Data& imageData, std::string_view key)
             break;
         }
 
-        Image* image = new Image();
-        AX_BREAK_IF(nullptr == image);
-
-        bool bRet = image->initWithImageData(imageData.getBytes(), imageData.getSize());
-        AX_BREAK_IF(!bRet);
+        Image image;
+        AX_BREAK_IF(!image.initWithImageData(imageData.getBytes(), imageData.getSize()));
 
         texture = new Texture2D();
 
         if (texture)
         {
-            if (texture->initWithImage(image))
+            const bool initialized = colorSpaceOverride
+                                         ? texture->initWithImage(&image, PixelFormat::NONE, false, *colorSpaceOverride)
+                                         : texture->initWithImage(&image);
+            if (initialized)
             {
 
 #if AX_ENABLE_CONTEXT_LOSS_RECOVERY
-                VolatileTextureMgr::addImage(texture, image);
+                // Keep the compact encoded source (KTX2/PNG/etc.), not the decoded
+                // upload image. Context restore decodes into a short-lived Image.
+                VolatileTextureMgr::addEncodedImageData(
+                    texture, retainedSource ? retainedSource : std::make_shared<const Data>(imageData));
 #endif
                 _textures.emplace(key, texture);
             }
@@ -641,8 +679,6 @@ Texture2D* TextureCache::addImage(const Data& imageData, std::string_view key)
         {
             AXLOGW("Allocating memory for Texture2D failed!");
         }
-
-        AX_SAFE_RELEASE(image);
 
     } while (0);
 
@@ -890,8 +926,9 @@ void VolatileTextureMgr::addImageTexture(Texture2D* tt, std::string_view imageFi
     VolatileTexture* vt = ensureVolatileTexture(tt);
 
     vt->_cachedImageType = VolatileTexture::kImageFile;
-    vt->_fileName        = imageFileName;
-    vt->_pixelFormat     = tt->getPixelFormat();
+    vt->_encodedImageData.reset();
+    vt->_fileName    = imageFileName;
+    vt->_pixelFormat = tt->getPixelFormat();
 }
 
 void VolatileTextureMgr::addImage(Texture2D* tt, Image* image)
@@ -907,7 +944,8 @@ void VolatileTextureMgr::addImage(Texture2D* tt, Image* image)
         image->retain();
         vt->_image           = image;
         vt->_cachedImageType = VolatileTexture::kImage;
-        vt->_pixelFormat     = tt->getPixelFormat();
+        vt->_encodedImageData.reset();
+        vt->_pixelFormat = tt->getPixelFormat();
     }
 }
 
@@ -947,10 +985,22 @@ void VolatileTextureMgr::addDataTexture(Texture2D* tt,
     VolatileTexture* vt = ensureVolatileTexture(tt);
 
     vt->_cachedImageType = VolatileTexture::kImageData;
-    vt->_textureData     = data;
-    vt->_dataLen         = dataLen;
-    vt->_pixelFormat     = pixelFormat;
-    vt->_textureSize     = contentSize;
+    vt->_encodedImageData.reset();
+    vt->_textureData = data;
+    vt->_dataLen     = dataLen;
+    vt->_pixelFormat = pixelFormat;
+    vt->_textureSize = contentSize;
+}
+
+void VolatileTextureMgr::addEncodedImageData(Texture2D* tt, const std::shared_ptr<const Data>& encodedData)
+{
+    if (_isReloading || tt == nullptr || !encodedData || encodedData->isNull())
+        return;
+
+    VolatileTexture* vt   = ensureVolatileTexture(tt);
+    vt->_cachedImageType  = VolatileTexture::kEncodedImageData;
+    vt->_encodedImageData = encodedData;
+    vt->_pixelFormat      = tt->getPixelFormat();
 }
 
 void VolatileTextureMgr::addStringTexture(Texture2D* tt, std::string_view text, const FontDefinition& fontDefinition)
@@ -963,8 +1013,9 @@ void VolatileTextureMgr::addStringTexture(Texture2D* tt, std::string_view text, 
     VolatileTexture* vt = ensureVolatileTexture(tt);
 
     vt->_cachedImageType = VolatileTexture::kString;
-    vt->_text            = text;
-    vt->_fontDefinition  = fontDefinition;
+    vt->_encodedImageData.reset();
+    vt->_text           = text;
+    vt->_fontDefinition = fontDefinition;
 }
 
 void VolatileTextureMgr::removeTexture(Texture2D* t)
@@ -1046,6 +1097,18 @@ void VolatileTextureMgr::reloadTexture(VolatileTexture* vt)
         case VolatileTexture::kImageData:
             texture->updateData(vt->_textureData, vt->_textureSize.width, vt->_textureSize.height);
             break;
+        case VolatileTexture::kEncodedImageData:
+        {
+            Image image;
+            if (!vt->_encodedImageData ||
+                !image.initWithImageData(vt->_encodedImageData->getBytes(), vt->_encodedImageData->getSize()))
+            {
+                AXLOGE("VolatileTexture: failed to decode retained image source during context restore");
+                break;
+            }
+            texture->updateData(&image);
+            break;
+        }
         case VolatileTexture::kString:
             texture->updateData(vt->_text, vt->_fontDefinition);
             break;

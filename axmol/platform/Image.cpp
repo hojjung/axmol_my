@@ -31,23 +31,27 @@ THE SOFTWARE.
 #include <string>
 #include <ctype.h>
 #include <algorithm>
+#include <limits>
+#include <mutex>
 
 #include "axmol/tlx/utility.hpp"
-#include "axmol/base/Config.h"  // AX_USE_JPEG, AX_USE_WEBP
+#include "axmol/base/Config.h"  // AX_USE_BMP, AX_USE_JPEG, AX_USE_WEBP
 
-#define STBI_NO_JPEG
-#define STBI_NO_PNG
-#define STBI_NO_GIF
-#define STBI_NO_PSD
-#define STBI_NO_PIC
-#define STBI_NO_PNM
-#define STBI_NO_HDR
-#define STBI_NO_TGA
-#define STB_IMAGE_IMPLEMENTATION
-#if AX_TARGET_PLATFORM == AX_PLATFORM_IOS
-#    define STBI_NO_THREAD_LOCALS
+#if AX_USE_BMP
+#    define STBI_NO_JPEG
+#    define STBI_NO_PNG
+#    define STBI_NO_GIF
+#    define STBI_NO_PSD
+#    define STBI_NO_PIC
+#    define STBI_NO_PNM
+#    define STBI_NO_HDR
+#    define STBI_NO_TGA
+#    define STB_IMAGE_IMPLEMENTATION
+#    if AX_TARGET_PLATFORM == AX_PLATFORM_IOS
+#        define STBI_NO_THREAD_LOCALS
+#    endif
+#    include "stb/stb_image.h"
 #endif
-#include "stb/stb_image.h"
 
 extern "C" {
 // To resolve link error when building 32bits with Xcode 6.
@@ -115,6 +119,10 @@ struct dirent* readdir$INODE64(DIR* dir)
 #include "axmol/base/etc2.h"
 
 #include "axmol/base/astc.h"
+
+#if defined(AX_ENABLE_KTX2) && AX_ENABLE_KTX2
+#    include <basisu_transcoder.h>
+#endif
 
 #if AX_USE_WEBP
 #    include "webp/decode.h"
@@ -623,6 +631,7 @@ Image::Image()
     , _unpack(false)
     , _fileType(Format::UNKNOWN)
     , _pixelFormat(rhi::PixelFormat::NONE)
+    , _colorSpace(rhi::ColorSpace::Linear)
     , _numberOfMipmaps(0)
     , _hasPremultipliedAlpha(false)
 {}
@@ -725,6 +734,7 @@ bool Image::initWithImageData(uint8_t* data, ssize_t dataLen, bool ownData)
         case Format::WEBP:
             ret = initWithWebpData(unpackedData, unpackedLen);
             break;
+#if defined(AX_ENABLE_LEGACY_IMAGE_FORMATS) && AX_ENABLE_LEGACY_IMAGE_FORMATS
         case Format::PVR:
             ret = initWithPVRData(unpackedData, unpackedLen, ownData);
             break;
@@ -743,11 +753,18 @@ bool Image::initWithImageData(uint8_t* data, ssize_t dataLen, bool ownData)
         case Format::ASTC:
             ret = initWithASTCData(unpackedData, unpackedLen, ownData);
             break;
+#endif
+        case Format::KTX2:
+            ret = initWithKTX2Data(unpackedData, unpackedLen);
+            break;
+#if AX_USE_BMP
         case Format::BMP:
             ret = initWithBmpData(unpackedData, unpackedLen);
             break;
+#endif
         default:
         {
+#if defined(AX_ENABLE_LEGACY_IMAGE_FORMATS) && AX_ENABLE_LEGACY_IMAGE_FORMATS
             // load and detect image format
             tImageTGA* tgaData = tgaLoadBuffer(unpackedData, static_cast<int32_t>(unpackedLen));
 
@@ -761,6 +778,9 @@ bool Image::initWithImageData(uint8_t* data, ssize_t dataLen, bool ownData)
             }
 
             free(tgaData);
+#else
+            AXLOGW("unsupported image format!");
+#endif
             break;
         }
         }
@@ -876,6 +896,15 @@ bool Image::isASTC(const uint8_t* data, ssize_t /*dataLen*/)
     return (magicval & 0x0FFFFFFF) == (ASTC_MAGIC_ID & 0x0FFFFFFF);  // wildcard check
 }
 
+bool Image::isKTX2(const uint8_t* data, ssize_t dataLen)
+{
+    static constexpr uint8_t KTX2_SIGNATURE[] = {
+        0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A,
+    };
+    return dataLen >= static_cast<ssize_t>(sizeof(KTX2_SIGNATURE)) &&
+           std::memcmp(data, KTX2_SIGNATURE, sizeof(KTX2_SIGNATURE)) == 0;
+}
+
 bool Image::isJpg(const uint8_t* data, ssize_t dataLen)
 {
     if (dataLen <= 4)
@@ -925,14 +954,17 @@ Image::Format Image::detectFormat(const uint8_t* data, ssize_t dataLen)
     {
         return Format::JPG;
     }
+#if AX_USE_BMP
     else if (isBmp(data, dataLen))
     {
         return Format::BMP;
     }
+#endif
     else if (isWebp(data, dataLen))
     {
         return Format::WEBP;
     }
+#if defined(AX_ENABLE_LEGACY_IMAGE_FORMATS) && AX_ENABLE_LEGACY_IMAGE_FORMATS
     else if (isPvr(data, dataLen))
     {
         return Format::PVR;
@@ -953,6 +985,12 @@ Image::Format Image::detectFormat(const uint8_t* data, ssize_t dataLen)
     {
         return Format::ASTC;
     }
+#endif
+    else if (isKTX2(data, dataLen))
+    {
+        return Format::KTX2;
+    }
+#if defined(AX_ENABLE_LEGACY_IMAGE_FORMATS) && AX_ENABLE_LEGACY_IMAGE_FORMATS
     else if (dataLen >= KTX_V1_HEADER_SIZE)
     {  // Check whether ktxspec v1.1 file format
         auto header = (KTXv1Header*)data;
@@ -973,6 +1011,7 @@ Image::Format Image::detectFormat(const uint8_t* data, ssize_t dataLen)
             }
         }
     }
+#endif
 
     return Format::UNKNOWN;
 }
@@ -1404,6 +1443,7 @@ bool Image::initWithPngData(uint8_t* data, ssize_t dataLen)
 
 bool Image::initWithBmpData(uint8_t* data, ssize_t dataLen)
 {
+#if AX_USE_BMP
     const int nrChannels = 4;
     _data = stbi_load_from_memory(data, static_cast<int>(dataLen), &_width, &_height, nullptr, nrChannels);
     if (_data)
@@ -1414,6 +1454,12 @@ bool Image::initWithBmpData(uint8_t* data, ssize_t dataLen)
         return true;
     }
     return false;
+#else
+    AX_UNUSED_PARAM(data);
+    AX_UNUSED_PARAM(dataLen);
+    AXLOGW("bmp is not enabled, please enable it in Config.h");
+    return false;
+#endif
 }
 
 bool Image::initWithWebpData(uint8_t* data, ssize_t dataLen)
@@ -2010,6 +2056,135 @@ bool Image::initWithPVRv3Data(uint8_t* data, ssize_t dataLen, bool ownData)
     }
 
     return true;
+}
+
+bool Image::initWithKTX2Data(uint8_t* data, ssize_t dataLen)
+{
+#if defined(AX_ENABLE_KTX2) && AX_ENABLE_KTX2
+    if (!data || dataLen <= 0 || static_cast<uint64_t>(dataLen) > std::numeric_limits<uint32_t>::max())
+    {
+        AXLOGE("KTX2 payload is empty or exceeds the 32-bit BasisU runtime limit");
+        return false;
+    }
+
+    static std::once_flag transcoderInitialization;
+    std::call_once(transcoderInitialization, [] { basist::basisu_transcoder_init(); });
+
+    basist::ktx2_transcoder transcoder;
+    if (!transcoder.init(data, static_cast<uint32_t>(dataLen)))
+    {
+        AXLOGE("Invalid or unsupported KTX2 header: {}", _filePath);
+        return false;
+    }
+
+    const uint64_t pixelDepth = transcoder.get_header().m_pixel_depth.get_uint64();
+    if (transcoder.get_faces() != 1 || transcoder.get_layers() > 1 || pixelDepth > 1 || transcoder.get_levels() == 0 ||
+        transcoder.get_levels() > MIPMAP_MAX || transcoder.get_width() > std::numeric_limits<uint16_t>::max() ||
+        transcoder.get_height() > std::numeric_limits<uint16_t>::max() || transcoder.is_hdr())
+    {
+        AXLOGE("KTX2 runtime accepts only LDR 2D textures within the 16-bit RHI extent and at most {} mip levels: {}",
+               MIPMAP_MAX, _filePath);
+        return false;
+    }
+
+    struct TranscodeTarget
+    {
+        bool deviceSupported;
+        basist::transcoder_texture_format basisFormat;
+        rhi::PixelFormat pixelFormat;
+    };
+
+    const auto* environment         = Environment::getInstance();
+    const TranscodeTarget targets[] = {
+        {environment->supportsASTC(), basist::transcoder_texture_format::cTFASTC_LDR_4x4_RGBA,
+         rhi::PixelFormat::ASTC4x4},
+        {environment->supportsETC2(), basist::transcoder_texture_format::cTFETC2_RGBA, rhi::PixelFormat::ETC2_RGBA},
+        {environment->supportsS3TC(), basist::transcoder_texture_format::cTFBC3_RGBA, rhi::PixelFormat::S3TC_DXT5},
+        {true, basist::transcoder_texture_format::cTFRGBA32, rhi::PixelFormat::RGBA8},
+    };
+
+    const TranscodeTarget* selected = nullptr;
+    for (const auto& target : targets)
+    {
+        if (target.deviceSupported &&
+            basist::basis_is_format_supported(target.basisFormat, transcoder.get_basis_tex_format()))
+        {
+            selected = &target;
+            break;
+        }
+    }
+    if (!selected || !transcoder.start_transcoding())
+    {
+        AXLOGE("BasisU cannot transcode KTX2 texture: {}", _filePath);
+        return false;
+    }
+
+    _width                 = static_cast<int>(transcoder.get_width());
+    _height                = static_cast<int>(transcoder.get_height());
+    _pixelFormat           = selected->pixelFormat;
+    _colorSpace            = transcoder.is_srgb() ? rhi::ColorSpace::Srgb : rhi::ColorSpace::Linear;
+    _hasPremultipliedAlpha = false;
+    _numberOfMipmaps       = 0;
+    _unpack                = true;
+
+    for (uint32_t level = 0; level < transcoder.get_levels(); ++level)
+    {
+        basist::ktx2_image_level_info levelInfo{};
+        if (!transcoder.get_image_level_info(levelInfo, level, 0, 0) || levelInfo.m_orig_width == 0 ||
+            levelInfo.m_orig_height == 0)
+        {
+            AXLOGE("KTX2 mip {} has invalid dimensions: {}", level, _filePath);
+            return false;
+        }
+
+        const bool uncompressed = basist::basis_transcoder_format_is_uncompressed(selected->basisFormat);
+        const uint64_t unitCount =
+            uncompressed ? static_cast<uint64_t>(levelInfo.m_orig_width) * levelInfo.m_orig_height
+                         : static_cast<uint64_t>(
+                               (levelInfo.m_orig_width + basist::basis_get_block_width(selected->basisFormat) - 1) /
+                               basist::basis_get_block_width(selected->basisFormat)) *
+                               ((levelInfo.m_orig_height + basist::basis_get_block_height(selected->basisFormat) - 1) /
+                                basist::basis_get_block_height(selected->basisFormat));
+        const uint64_t byteCount = unitCount * basist::basis_get_bytes_per_block_or_pixel(selected->basisFormat);
+        if (unitCount == 0 || unitCount > std::numeric_limits<uint32_t>::max() || byteCount == 0 ||
+            byteCount > std::numeric_limits<uint32_t>::max())
+        {
+            AXLOGE("KTX2 mip {} output size overflows the runtime limit: {}", level, _filePath);
+            return false;
+        }
+
+        void* pixels = std::malloc(static_cast<size_t>(byteCount));
+        if (!pixels)
+        {
+            AXLOGE("KTX2 mip {} allocation failed ({} bytes): {}", level, byteCount, _filePath);
+            return false;
+        }
+
+        _mipmaps[level].data       = pixels;
+        _mipmaps[level].dataSize   = static_cast<uint32_t>(byteCount);
+        _mipmaps[level].layerIndex = 0;
+        _mipmaps[level].mipLevel   = static_cast<uint16_t>(level);
+        _numberOfMipmaps           = static_cast<int>(level + 1);
+
+        if (!transcoder.transcode_image_level(level, 0, 0, pixels, static_cast<uint32_t>(unitCount),
+                                              selected->basisFormat))
+        {
+            AXLOGE("KTX2 mip {} transcode failed: {}", level, _filePath);
+            return false;
+        }
+    }
+
+    _data     = static_cast<uint8_t*>(_mipmaps[0].data);
+    _dataSize = _mipmaps[0].dataSize;
+    _offset   = 0;
+    _fileType = Format::KTX2;
+    return true;
+#else
+    (void)data;
+    (void)dataLen;
+    AXLOGE("KTX2 support is disabled; configure with AX_ENABLE_KTX2=ON");
+    return false;
+#endif
 }
 
 bool Image::initWithETCData(uint8_t* data, ssize_t dataLen, bool ownData)

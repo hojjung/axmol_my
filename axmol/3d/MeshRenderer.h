@@ -52,6 +52,7 @@ class Mesh;
 class Texture2D;
 class MeshSkin;
 class AttachNode;
+class StylizedRenderer;
 struct NodeData;
 /** @brief MeshRenderer: A mesh can be loaded from model files, .obj, .c3t, .c3b
  *and a mesh renderer renders a list of these loaded meshes with specified materials
@@ -96,7 +97,14 @@ public:
     void setTexture(std::string_view texFile);
     void setTexture(Texture2D* texture);
 
-    /** get Mesh by index */
+    /**
+     * Get a mesh by its flattened asset index.
+     *
+     * File-backed glTF renderers keep imported node transforms below an
+     * external-placement root. These accessors preserve the historical
+     * MeshRenderer contract by transparently including those imported child
+     * renderers.
+     */
     Mesh* getMeshByIndex(int index) const;
 
     /** get Mesh by Name, returns the first one if there are more than one mesh with the same name */
@@ -112,8 +120,8 @@ public:
     /** get mesh at index 0 which is the default mesh */
     Mesh* getMesh() const;
 
-    /** get mesh count */
-    ssize_t getMeshCount() const { return _meshes.size(); }
+    /** get the flattened mesh count for this asset */
+    ssize_t getMeshCount() const;
 
     Skeleton3D* getSkeleton() const { return _skeleton; }
 
@@ -163,7 +171,7 @@ public:
     /**
      * Force depth buffer writing, this is useful if you want to achieve effects like fading.
      */
-    void setForceDepthWrite(bool value) { _forceDepthWrite = value; }
+    void setForceDepthWrite(bool value);
     bool isForceDepthWrite() const { return _forceDepthWrite; };
 
     /**
@@ -179,12 +187,22 @@ public:
 
     /** light mask getter & setter, lighting only works when _lightmask & light's flag are set to true, the default
      value of _lightmask is 0xffff */
-    void setLightMask(unsigned int mask) { _lightMask = mask; }
+    void setLightMask(unsigned int mask);
     unsigned int getLightMask() const { return _lightMask; }
+
+    /** Includes this renderer in directional shadow-caster collection. */
+    void setCastShadow(bool value);
+    bool getCastShadow() const { return _castShadow; }
+    bool isCastingShadow() const { return _castShadow; }
+
+    /** Enables sampling of the main directional shadow map. */
+    void setReceiveShadow(bool value);
+    bool getReceiveShadow() const { return _receiveShadow; }
+    bool isReceivingShadow() const { return _receiveShadow; }
 
     /** enables wireframe rendering mode for this mesh renderer only, this can be very useful for debugging and
      understanding generated meshes. */
-    void setWireframe(bool value) { _wireframe = value; }
+    void setWireframe(bool value);
     bool isWireframe() const { return _wireframe; }
 
     /** render all meshes within this mesh renderer */
@@ -223,8 +241,8 @@ public:
      */
     Material* getSubMeshMaterial(size_t subMeshIndex, size_t materialIndex = 0);
 
-    /** Get list of meshes used in this mesh renderer. */
-    const Vector<Mesh*>& getMeshes() const { return _meshes; }
+    /** Get the flattened list of meshes used by this asset. */
+    const Vector<Mesh*>& getMeshes() const;
 
     MeshRenderer();
     virtual ~MeshRenderer();
@@ -252,8 +270,8 @@ public:
     /** generate default material. */
     void genMaterial(bool useLight = false);
 
-    void createNode(NodeData* nodedata, Node* root, const MaterialDatas& materialdatas, bool singleMesh);
-    void createAttachMeshRendererNode(NodeData* nodedata, const MaterialDatas& materialdatas);
+    bool createNode(NodeData* nodedata, Node* root, const MaterialDatas& materialdatas, bool singleMesh);
+    bool createAttachMeshRendererNode(NodeData* nodedata, const MaterialDatas& materialdatas);
     MeshRenderer* createMeshRendererNode(NodeData* nodedata, ModelData* modeldata, const MaterialDatas& materialdatas);
 
     /** get MeshIndexData by Id */
@@ -312,10 +330,18 @@ public:
     void rebuildInstances();
 
 protected:
+    friend class StylizedRenderer;
+
     /** set specific mesh texture, for private use (create mesh stage) only */
     Texture2D* setMeshTexture(Mesh* mesh,
                               std::string_view texPath,
                               NTextureData::Usage usage = NTextureData::Usage::Diffuse);
+    Texture2D* setMeshTexture(Mesh* mesh, const NTextureData& textureData);
+    bool applyMaterialData(Mesh* mesh, const NMaterialData* materialData);
+
+    static void collectMeshRenderers(Node* node, std::vector<MeshRenderer*>& renderers);
+    static void collectMeshRenderers(const Node* node, std::vector<const MeshRenderer*>& renderers);
+    const AABB& getLocalAABB() const;
 
     /** set model texture from model path when model file not contains texture and texPath is empty
      * only for create mesh renderer
@@ -331,14 +357,21 @@ protected:
     BlendFunc _blend;
 
     Vector<Mesh*> _meshes;
+    mutable Vector<Mesh*> _flattenedMeshView;
 
-    mutable AABB _aabb;                  // cache current aabb
+    mutable AABB _aabb;                  // cache this node's meshes
+    mutable AABB _assetAabb;             // current aggregate for an imported asset root
     mutable Mat4 _nodeToWorldTransform;  // cache current matrix
     unsigned int _lightMask;
     mutable bool _aabbDirty;
     bool _shaderUsingLight;  // Is the current shader using lighting?
     bool _forceDepthWrite;   // Always write to depth buffer
     bool _wireframe;         // render in wireframe mode
+    bool _castShadow;
+    bool _receiveShadow;
+    bool _skeletonPosePreparedForVisit;
+    bool _preferStylizedMaterial;
+    bool _isImportedAssetRoot;
     bool _usingAutogeneratedProgram;
     bool _transparentMaterialHint;    // Generate transparent materials when building from files
     unsigned short _meshTextureHint;  // Whether model file has texture config

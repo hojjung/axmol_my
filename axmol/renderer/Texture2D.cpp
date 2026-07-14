@@ -44,7 +44,8 @@ THE SOFTWARE.
 #include "axmol/base/NinePatchImageParser.h"
 #include "axmol/rhi/GraphicsCore.h"
 #include "axmol/rhi/RHIUtils.h"
-#include "axmol/rhi/GraphicsCore.h"
+
+#include <limits>
 
 #if AX_ENABLE_CONTEXT_LOSS_RECOVERY
 #    include "axmol/renderer/TextureCache.h"
@@ -52,6 +53,19 @@ THE SOFTWARE.
 
 namespace ax
 {
+namespace
+{
+bool isValidTextureExtent(int width, int height)
+{
+    if (width <= 0 || height <= 0 || width > std::numeric_limits<uint16_t>::max() ||
+        height > std::numeric_limits<uint16_t>::max())
+        return false;
+
+    const int deviceLimit = axdrv->getMaxTextureSize();
+    return deviceLimit <= 0 || (width <= deviceLimit && height <= deviceLimit);
+}
+}  // namespace
+
 static bool createStringTextureData(std::string_view text,
                                     const FontDefinition& textDefinition,
                                     Data& outData,
@@ -127,6 +141,13 @@ void Texture2D::chooseSamplerDesc(bool antialiasEnabled, bool mipEnabled, rhi::S
     }
     else
         desc.mipFilter = rhi::SamplerFilter::MIP_DEFAULT;
+}
+
+Texture2D::TexParams Texture2D::resolveTexParameters(TexParams requested, bool hasMipmaps) noexcept
+{
+    if (!hasMipmaps)
+        requested.mipFilter = rhi::SamplerFilter::MIP_DEFAULT;
+    return requested;
 }
 
 Texture2D::Texture2D()
@@ -209,6 +230,20 @@ bool Texture2D::initWithImage(Image* image, rhi::PixelFormat renderFormat, bool 
         return false;
     }
 
+    return initWithImage(image, renderFormat, autoGenMipmaps, image->getColorSpace());
+}
+
+bool Texture2D::initWithImage(Image* image,
+                              rhi::PixelFormat renderFormat,
+                              bool autoGenMipmaps,
+                              rhi::ColorSpace colorSpace)
+{
+    if (image == nullptr)
+    {
+        AXLOGW("axmol: Texture2D. Can't create Texture. UIImage is nil");
+        return false;
+    }
+
     if (this->_filePath.empty())
         this->_filePath = image->getFilePath();
 
@@ -222,23 +257,19 @@ bool Texture2D::initWithImage(Image* image, rhi::PixelFormat renderFormat, bool 
     {
         // pixel format of data is not converted, renderFormat can be different from pixelFormat
         // it will be done later
-        initWithMipmaps(image->getMipmaps(), imagePixelFormat, renderFormat, imageHeight, imageWidth,
-                        image->hasPremultipliedAlpha());
+        return initWithMipmaps(image->getMipmaps(), imagePixelFormat, renderFormat, imageWidth, imageHeight,
+                               image->hasPremultipliedAlpha(), colorSpace);
     }
     else if (image->isCompressed())
     {  // !Only hardware support texture will be compression PixelFormat, otherwise, will convert to RGBA8 duraing image
        // load
-        initWithData(imageData, imageDataSize, imagePixelFormat, imagePixelFormat, imageWidth, imageHeight,
-                     image->hasPremultipliedAlpha(), autoGenMipmaps);
-    }
-    else
-    {
-        // after conversion, renderFormat == pixelFormat of data
-        initWithData(imageData, imageDataSize, imagePixelFormat, renderFormat, imageWidth, imageHeight,
-                     image->hasPremultipliedAlpha(), autoGenMipmaps);
+        return initWithData(imageData, imageDataSize, imagePixelFormat, imagePixelFormat, imageWidth, imageHeight,
+                            image->hasPremultipliedAlpha(), autoGenMipmaps, colorSpace);
     }
 
-    return true;
+    // after conversion, renderFormat == pixelFormat of data
+    return initWithData(imageData, imageDataSize, imagePixelFormat, renderFormat, imageWidth, imageHeight,
+                        image->hasPremultipliedAlpha(), autoGenMipmaps, colorSpace);
 }
 
 bool Texture2D::initWithData(const void* data,
@@ -248,15 +279,22 @@ bool Texture2D::initWithData(const void* data,
                              int pixelsWide,
                              int pixelsHigh,
                              bool preMultipliedAlpha,
-                             bool autoGenMipmaps)
+                             bool autoGenMipmaps,
+                             rhi::ColorSpace colorSpace)
 {
     AXASSERT(dataSize > 0 && pixelsWide > 0 && pixelsHigh > 0, "Invalid size");
+    if (dataSize <= 0 || !isValidTextureExtent(pixelsWide, pixelsHigh))
+    {
+        AXLOGE("Texture2D: invalid {}x{} texture extent", pixelsWide, pixelsHigh);
+        return false;
+    }
 
     rhi::TextureDesc desc;
 
     desc.width       = pixelsWide;
     desc.height      = pixelsHigh;
     desc.pixelFormat = pixelFormat;
+    desc.colorSpace  = colorSpace;
 
     if (autoGenMipmaps)
         desc.mipLevels = 0;  // generate mipmaps by GPU
@@ -270,8 +308,15 @@ bool Texture2D::initWithMipmaps(std::span<MipmapInfo> mipmaps,
                                 rhi::PixelFormat renderFormat,
                                 int pixelsWide,
                                 int pixelsHigh,
-                                bool preMultipliedAlpha)
+                                bool preMultipliedAlpha,
+                                rhi::ColorSpace colorSpace)
 {
+    if (mipmaps.empty() || !isValidTextureExtent(pixelsWide, pixelsHigh) ||
+        mipmaps.size() > std::numeric_limits<uint16_t>::max())
+    {
+        AXLOGE("Texture2D: invalid {}x{} mipmapped texture extent/count", pixelsWide, pixelsHigh);
+        return false;
+    }
 
     rhi::TextureDesc desc;
 
@@ -279,6 +324,7 @@ bool Texture2D::initWithMipmaps(std::span<MipmapInfo> mipmaps,
     desc.height      = pixelsHigh;
     desc.pixelFormat = pixelFormat;
     desc.mipLevels   = mipmaps.size();
+    desc.colorSpace  = colorSpace;
     return initWithSpec(desc, reinterpret_cast<std::span<TextureSliceData>&>(mipmaps), renderFormat,
                         preMultipliedAlpha);
 }
@@ -706,7 +752,7 @@ void Texture2D::removeSpriteFrameCapInset(SpriteFrame* spriteFrame)
 
 void Texture2D::setTexParameters(const Texture2D::TexParams& desc)
 {
-    _rhiTexture->updateSamplerDesc(desc);
+    _rhiTexture->updateSamplerDesc(resolveTexParameters(desc, _rhiTexture->hasMipmaps()));
 }
 
 }  // namespace ax

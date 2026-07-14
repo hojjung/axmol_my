@@ -65,6 +65,7 @@ public:
         DIFFUSE,         // diffuse (pixel lighting)
         DIFFUSE_NOTEX,   // diffuse (without texture)
         BUMPED_DIFFUSE,  // bumped diffuse
+        STYLIZED,        // lightweight two-band stylized material
         QUAD_TEXTURE,    // textured quad material
         QUAD_COLOR,      // colored quad material (without texture)
 

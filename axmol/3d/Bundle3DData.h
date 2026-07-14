@@ -27,12 +27,14 @@
 #pragma once
 
 #include "axmol/base/Object.h"
+#include "axmol/base/Data.h"
 #include "axmol/base/Types.h"
 #include "axmol/math/Math.h"
 #include "axmol/math/AABB.h"
 
 #include <vector>
 #include <map>
+#include <memory>
 #include <string>
 
 #include "axmol/3d/shaderinfos.h"
@@ -64,6 +66,8 @@ struct ModelData
     std::string materialId;
     std::vector<std::string> bones;
     std::vector<Mat4> invBindPose;
+    // glTF skin matrices already produce positions in the imported skeleton's scene space.
+    bool skinningInSkeletonSpace = false;
 
     virtual ~ModelData() {}
 
@@ -71,6 +75,7 @@ struct ModelData
     {
         bones.clear();
         invBindPose.clear();
+        skinningInSkeletonSpace = false;
     }
 };
 
@@ -292,14 +297,36 @@ struct NTextureData
     };
     std::string id;
     std::string filename;
-    Usage type;
-    rhi::SamplerAddressMode wrapS;
-    rhi::SamplerAddressMode wrapT;
+    std::string cacheKey;
+    std::shared_ptr<const Data> embeddedData;
+    Usage type                    = Usage::Unknown;
+    rhi::ColorSpace colorSpace    = rhi::ColorSpace::Linear;
+    rhi::SamplerFilter minFilter  = rhi::SamplerFilter::MIN_LINEAR;
+    rhi::SamplerFilter magFilter  = rhi::SamplerFilter::MAG_LINEAR;
+    rhi::SamplerFilter mipFilter  = rhi::SamplerFilter::MIP_DEFAULT;
+    rhi::SamplerAddressMode wrapS = rhi::SamplerAddressMode::REPEAT;
+    rhi::SamplerAddressMode wrapT = rhi::SamplerAddressMode::REPEAT;
+    Vec2 offset{0.0F, 0.0F};
+    Vec2 scale{1.0F, 1.0F};
+    float rotation    = 0.0F;
+    int texCoord      = 0;
+    bool hasTransform = false;
 };
 struct NMaterialData
 {
+    enum class AlphaMode
+    {
+        Opaque,
+        Mask,
+        Blend,
+    };
+
     std::vector<NTextureData> textures;
     std::string id;
+    Color baseColor{1.0F, 1.0F, 1.0F, 1.0F};
+    float alphaCutoff   = 0.5F;
+    AlphaMode alphaMode = AlphaMode::Opaque;
+    bool doubleSided    = false;
     const NTextureData* getTextureData(const NTextureData::Usage& type) const
     {
         for (const auto& it : textures)
@@ -359,20 +386,23 @@ public:
     tlx::string_map<std::vector<Vec3Key>> _scaleKeys;
 
     float _totalTime;
+    bool _usesAbsoluteLocalTransforms;
 
 public:
-    Animation3DData() : _totalTime(0) {}
+    Animation3DData() : _totalTime(0), _usesAbsoluteLocalTransforms(false) {}
 
     Animation3DData(const Animation3DData& other)
         : _translationKeys(other._translationKeys)
         , _rotationKeys(other._rotationKeys)
         , _scaleKeys(other._scaleKeys)
         , _totalTime(other._totalTime)
+        , _usesAbsoluteLocalTransforms(other._usesAbsoluteLocalTransforms)
     {}
 
     void resetData()
     {
-        _totalTime = 0;
+        _totalTime                   = 0;
+        _usesAbsoluteLocalTransforms = false;
         _translationKeys.clear();
         _rotationKeys.clear();
         _scaleKeys.clear();

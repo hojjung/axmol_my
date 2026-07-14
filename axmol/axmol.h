@@ -237,17 +237,22 @@ THE SOFTWARE.
 #include "axmol/3d/Animate3D.h"
 #include "axmol/3d/Animation3D.h"
 #include "axmol/3d/AttachNode.h"
-#include "axmol/3d/BillBoard.h"
 #include "axmol/3d/Mesh.h"
 #include "axmol/3d/MeshSkin.h"
-#include "axmol/3d/MotionStreak3D.h"
 #include "axmol/3d/MeshVertexIndexData.h"
 #include "axmol/3d/Skeleton3D.h"
-#include "axmol/3d/Skybox.h"
 #include "axmol/3d/MeshRenderer.h"
 #include "axmol/3d/MeshMaterial.h"
-#include "axmol/3d/Terrain.h"
+#include "axmol/3d/StylizedMaterial.h"
+#include "axmol/3d/StylizedQuality.h"
+#include "axmol/3d/StylizedRenderer.h"
 #include "axmol/3d/VertexInputBinding.h"
+#if defined(AX_ENABLE_LEGACY_3D) && AX_ENABLE_LEGACY_3D
+#    include "axmol/3d/BillBoard.h"
+#    include "axmol/3d/MotionStreak3D.h"
+#    include "axmol/3d/Skybox.h"
+#    include "axmol/3d/Terrain.h"
+#endif
 
 namespace ax
 {

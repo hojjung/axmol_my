@@ -36,8 +36,10 @@ THE SOFTWARE.
 #include <string>
 #include <unordered_map>
 #include <functional>
+#include <memory>
 
 #include "axmol/base/Object.h"
+#include "axmol/base/Data.h"
 #include "axmol/renderer/Texture2D.h"
 #include "axmol/platform/Image.h"
 #include "axmol/base/JobSystem.h"
@@ -152,6 +154,8 @@ public:
      * If "key" is nil, then a new texture will be created each time.
      */
     Texture2D* addImage(const Data& imageData, std::string_view key);
+    Texture2D* addImage(const std::shared_ptr<const Data>& imageData, std::string_view key);
+    Texture2D* addImage(const std::shared_ptr<const Data>& imageData, std::string_view key, rhi::ColorSpace colorSpace);
 
     /** Returns an already created texture. Returns nil if the texture doesn't exist.
     @param key It's the related/absolute path of the file image.
@@ -223,6 +227,10 @@ public:
     void renameTextureWithKey(std::string_view srcName, std::string_view dstName);
 
 private:
+    Texture2D* addImageInternal(const Data& imageData,
+                                std::string_view key,
+                                const std::shared_ptr<const Data>& retainedSource,
+                                const rhi::ColorSpace* colorSpaceOverride = nullptr);
     void addImageAsyncCallBack(float dt);
     void loadImage();
     void parseNinePatchImage(Image* image, Texture2D* texture, std::string_view path);
@@ -269,6 +277,7 @@ class VolatileTexture
         kInvalid = 0,
         kImageFile,
         kImageData,
+        kEncodedImageData,
         kString,
         kImage,
     } CachedImageType;
@@ -289,6 +298,7 @@ protected:
     CachedImageType _cachedImageType;
 
     void* _textureData;
+    std::shared_ptr<const Data> _encodedImageData;
     int _dataLen;
     Vec2 _textureSize;
     rhi::PixelFormat _pixelFormat;
@@ -309,6 +319,8 @@ public:
                                int dataLen,
                                rhi::PixelFormat pixelFormat,
                                const Vec2& contentSize);
+    /** Retains encoded image bytes and decodes them only while rebuilding a lost context. */
+    static void addEncodedImageData(Texture2D* tt, const std::shared_ptr<const Data>& encodedData);
     static void addImage(Texture2D* tt, Image* image);
     static void removeTexture(Texture2D* t);
     static void reloadAllTextures();

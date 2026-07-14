@@ -246,6 +246,11 @@ THE SOFTWARE.
 #    define AX_USE_PNG 1
 #endif  // AX_USE_PNG
 
+/** Support BMP or not. */
+#ifndef AX_USE_BMP
+#    define AX_USE_BMP 1
+#endif  // AX_USE_BMP
+
 /** Support JPEG or not. If your application don't use jpeg format picture, you can undefine this macro to save package
  * size.
  */

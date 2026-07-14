@@ -90,6 +90,8 @@ public:
         TGA,
         //! ASTC
         ASTC,
+        //! KTX2 with Basis Universal ETC1S/UASTC payload
+        KTX2,
         //! Raw Data
         RAW_DATA,
         //! Unknown format
@@ -161,6 +163,7 @@ public:
     ssize_t getDataSize() { return _dataSize - _offset; }
     Format getFileType() { return _fileType; }
     rhi::PixelFormat getPixelFormat() { return _pixelFormat; }
+    rhi::ColorSpace getColorSpace() const { return _colorSpace; }
     int getWidth() { return _width; }
     int getHeight() { return _height; }
     int getNumberOfMipmaps() { return _numberOfMipmaps; }
@@ -201,6 +204,7 @@ protected:
     bool initWithETCData(uint8_t* data, ssize_t dataLen, bool ownData);
     bool initWithETC2Data(uint8_t* data, ssize_t dataLen, bool ownData);
     bool initWithASTCData(uint8_t* data, ssize_t dataLen, bool ownData);
+    bool initWithKTX2Data(uint8_t* data, ssize_t dataLen);
     bool initWithS3TCData(uint8_t* data, ssize_t dataLen, bool ownData);
     bool initWithATITCData(uint8_t* data, ssize_t dataLen, bool ownData);
 
@@ -215,7 +219,7 @@ protected:
      @brief Determine how many mipmaps can we have.
      It's same as define but it respects namespaces
      */
-    static const int MIPMAP_MAX = 16;
+    static constexpr int MIPMAP_MAX = 16;
     /**
      @brief Determine whether we premultiply alpha for png files.
      */
@@ -230,6 +234,7 @@ protected:
     bool _unpack;
     Format _fileType;
     rhi::PixelFormat _pixelFormat;
+    rhi::ColorSpace _colorSpace;
     MipmapInfo _mipmaps[MIPMAP_MAX];  // pointer to mipmap images
     int _numberOfMipmaps;
     // false if we can't auto detect the image is premultiplied or not.
@@ -260,6 +265,7 @@ protected:
     bool isEtc2(const uint8_t* data, ssize_t dataLen);
     bool isS3TC(const uint8_t* data, ssize_t dataLen);
     bool isASTC(const uint8_t* data, ssize_t dataLen);
+    bool isKTX2(const uint8_t* data, ssize_t dataLen);
 };
 
 // end of platform group

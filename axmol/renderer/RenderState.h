@@ -141,6 +141,8 @@ public:
          */
         void setCullFace(bool enabled);
 
+        [[nodiscard]] bool isCullFaceEnabled() const noexcept { return _cullFaceEnabled; }
+
         /**
          * Sets the side of the facets to cull.
          *
@@ -149,6 +151,8 @@ public:
          * @param side The side to cull.
          */
         void setCullFaceSide(CullFaceSide side);
+
+        [[nodiscard]] CullFaceSide getCullFaceSide() const noexcept { return _cullFaceSide; }
 
         /**
          * Sets the winding for front facing polygons.

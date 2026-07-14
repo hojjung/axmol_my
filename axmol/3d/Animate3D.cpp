@@ -336,7 +336,6 @@ void Animate3D::update(float t)
             if (_weight > 0.0f)
             {
                 float transDst[3], rotDst[4], scaleDst[3];
-                float *trans = nullptr, *rot = nullptr, *scale = nullptr;
                 if (_playReverse)
                 {
                     t        = 1 - t;
@@ -348,8 +347,9 @@ void Animate3D::update(float t)
 
                 for (const auto& it : _boneCurves)
                 {
-                    auto bone  = it.first;
-                    auto curve = it.second;
+                    auto bone    = it.first;
+                    auto curve   = it.second;
+                    float *trans = nullptr, *rot = nullptr, *scale = nullptr;
                     if (curve->translateCurve)
                     {
                         curve->translateCurve->evaluate(t, transDst, _translateEvaluate);
@@ -372,24 +372,38 @@ void Animate3D::update(float t)
                 {
                     auto node  = it.first;
                     auto curve = it.second;
-                    Mat4 transform;
                     if (curve->translateCurve)
-                    {
                         curve->translateCurve->evaluate(t, transDst, _translateEvaluate);
-                        transform.translate(transDst[0], transDst[1], transDst[2]);
-                    }
                     if (curve->rotCurve)
-                    {
                         curve->rotCurve->evaluate(t, rotDst, _roteEvaluate);
-                        Quat qua(rotDst[0], rotDst[1], rotDst[2], rotDst[3]);
-                        transform.rotate(qua);
-                    }
                     if (curve->scaleCurve)
-                    {
                         curve->scaleCurve->evaluate(t, scaleDst, _scaleEvaluate);
-                        transform.scale(scaleDst[0], scaleDst[1], scaleDst[2]);
+
+                    if (_animation->usesAbsoluteLocalTransforms())
+                    {
+                        node->setAdditionalTransform(nullptr);
+                        if (curve->translateCurve)
+                            node->setPosition3D(Vec3{transDst[0], transDst[1], transDst[2]});
+                        if (curve->rotCurve)
+                            node->setRotationQuat(Quat{rotDst[0], rotDst[1], rotDst[2], rotDst[3]});
+                        if (curve->scaleCurve)
+                        {
+                            node->setScaleX(scaleDst[0]);
+                            node->setScaleY(scaleDst[1]);
+                            node->setScaleZ(scaleDst[2]);
+                        }
                     }
-                    node->setAdditionalTransform(&transform);
+                    else
+                    {
+                        Mat4 transform;
+                        if (curve->translateCurve)
+                            transform.translate(transDst[0], transDst[1], transDst[2]);
+                        if (curve->rotCurve)
+                            transform.rotate(Quat{rotDst[0], rotDst[1], rotDst[2], rotDst[3]});
+                        if (curve->scaleCurve)
+                            transform.scale(scaleDst[0], scaleDst[1], scaleDst[2]);
+                        node->setAdditionalTransform(&transform);
+                    }
                 }
                 if (!_keyFrameUserInfos.empty())
                 {

@@ -33,6 +33,10 @@ set(GAME_SOURCE
     Source/TestUtils.cpp
 
     Source/axmol/2d/NodeTests.cpp
+    Source/axmol/3d/StylizedQualityTests.cpp
+    Source/axmol/3d/StylizedMaterialTests.cpp
+    Source/axmol/3d/StylizedInstancingTests.cpp
+    Source/axmol/3d/StylizedRendererTests.cpp
     Source/axmol/3d/TerrainTests.cpp
 
     Source/axmol/base/MapTests.cpp
@@ -47,11 +51,26 @@ set(GAME_SOURCE
     Source/axmol/network/UriTests.cpp
 
     Source/axmol/platform/FileUtilsTests.cpp
+    Source/axmol/rhi/DXUtilsTests.cpp
+    Source/axmol/rhi/TextureFormatGLTests.cpp
+    Source/axmol/renderer/RenderTextureTests.cpp
+    Source/axmol/renderer/Texture2DTests.cpp
 
     Source/axmol/ui/UIHelperTests.cpp
     Source/axmol/tlx/ContainerTests.cpp
     Source/axmol/tlx/SplitTests.cpp
 )
+
+if(APPLE)
+    list(APPEND GAME_SOURCE Source/axmol/rhi/TextureFormatMTLTests.mm)
+endif()
+
+if(AX_ENABLE_GLTF)
+    list(APPEND GAME_SOURCE
+        Source/axmol/3d/GltfLoaderTests.cpp
+        Source/axmol/platform/ImageKtx2Tests.cpp
+    )
+endif()
 
 
 set(GAME_INC_DIRS

@@ -30,6 +30,9 @@
 #include "axmol/scene/Scene.h"
 #include "axmol/base/Director.h"
 
+#if defined(AX_ENABLE_3D) && AX_ENABLE_3D
+#    include "axmol/3d/StylizedRenderer.h"
+#endif
 #if defined(AX_ENABLE_NAVMESH)
 #    include "axmol/navmesh/NavMesh.h"
 #endif
@@ -84,6 +87,11 @@ void SceneCompositor::renderScene(Renderer* renderer, Scene* scene)
 
             camera->apply();
 
+#if defined(AX_ENABLE_3D) && AX_ENABLE_3D
+            if (auto* stylized = StylizedRenderer::get(*scene))
+                stylized->beginSceneVisit(*renderer, *camera);
+#endif
+
             // Override viewport to render texture dimensions (camera->apply sets it to screen)
             // renderer->setViewport(vp.x, vp.y, vp.width, vp.height);
 
@@ -101,6 +109,10 @@ void SceneCompositor::renderScene(Renderer* renderer, Scene* scene)
         else
         {
             camera->apply();
+#if defined(AX_ENABLE_3D) && AX_ENABLE_3D
+            if (auto* stylized = StylizedRenderer::get(*scene))
+                stylized->beginSceneVisit(*renderer, *camera);
+#endif
             camera->clearBackground();
             scene->visit(renderer, transform, 0);
 #if defined(AX_ENABLE_NAVMESH)

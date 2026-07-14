@@ -50,6 +50,7 @@ namespace rhi
 {
 class ProgramState;
 class Buffer;
+class Texture;
 }  // namespace rhi
 
 class AX_DLL Pass : public Object
@@ -106,7 +107,7 @@ public:
 
     void setTechnique(Technique* technique);
 
-    void updateMVPUniform(const Mat4& modelView);
+    void updateMVPUniform(const Mat4& modelView, const Mat4* viewProjectionOverride = nullptr);
 
     void setUniformTexture(uint32_t slot, rhi::Texture*);      // u_tex0
     void setUniformNormTexture(uint32_t slot, rhi::Texture*);  // u_normalTex
@@ -129,6 +130,16 @@ public:
     void setUniformSpotLightRangeInverse(const void*, size_t);
 
     void setUniformAmbientLigthColor(const void*, size_t);
+
+    void setUniformStylizedMaterial(const void*, size_t);
+    void setUniformStylizedUvTransform(const void*, size_t);
+    void setUniformStylizedLighting(const void*, size_t);
+    void setUniformMainShadowMatrix(const void*, size_t);
+    void setUniformShadowTexelSize(const void*, size_t);
+    void setUniformShadowBias(const void*, size_t);
+    void setUniformShadowEnabled(const void*, size_t);
+    void setUniformShadowParams(const void*, size_t);
+    void setUniformMainShadowMap(rhi::Texture* texture);
 
 protected:
     Pass();
@@ -180,6 +191,16 @@ private:
     rhi::UniformLocation _locSpotLightRangeInverse;
 
     rhi::UniformLocation _locAmbientLigthColor;
+
+    rhi::UniformLocation _locStylizedMaterial;
+    rhi::UniformLocation _locStylizedUvTransform;
+    rhi::UniformLocation _locStylizedLighting;
+    rhi::UniformLocation _locMainShadowMatrix;
+    rhi::UniformLocation _locShadowTexelSize;
+    rhi::UniformLocation _locShadowBias;
+    rhi::UniformLocation _locShadowEnabled;
+    rhi::UniformLocation _locShadowParams;
+    rhi::UniformLocation _locMainShadowMap;
 
     // renderer state cache variables
     bool _rendererDepthTestEnabled         = true;

@@ -28,6 +28,9 @@ THE SOFTWARE.
 ****************************************************************************/
 
 #include "axmol/scene/Scene.h"
+#if defined(AX_ENABLE_3D) && AX_ENABLE_3D
+#    include "axmol/3d/StylizedRenderer.h"
+#endif
 
 #include <algorithm>
 
@@ -211,7 +214,19 @@ void Scene::setDebugCamera(Camera* camera)
 
 void Scene::visit(Renderer* renderer, const Mat4& parentTransform, uint32_t parentFlags)
 {
+#if defined(AX_ENABLE_3D) && AX_ENABLE_3D
+    auto* stylizedRenderer = dynamic_cast<StylizedRenderer*>(getComponent(StylizedRenderer::COMPONENT_NAME));
+    auto* visitingCamera   = Camera::getVisitingCamera();
+    if (stylizedRenderer && visitingCamera)
+        stylizedRenderer->beginSceneVisit(*renderer, *visitingCamera);
+#endif
+
     Node::visit(renderer, parentTransform, parentFlags);
+
+#if defined(AX_ENABLE_3D) && AX_ENABLE_3D
+    if (stylizedRenderer && visitingCamera)
+        stylizedRenderer->endSceneVisit(*renderer);
+#endif
 }
 
 void Scene::removeAllChildren()

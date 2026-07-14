@@ -180,8 +180,14 @@ option(AX_ENABLE_PHYSICS_2D "Build Physics2D support" ON)
 cmake_dependent_option(AX_ENABLE_VIDEO "Build video support" ON "AX_ENABLE_MFMEDIA OR AX_ENABLE_VLC_MEDIA OR APPLE OR ANDROID" OFF)
 option(AX_ENABLE_AUDIO "Build audio support" ON)
 option(AX_ENABLE_OPUS "Build with opus support" ON)
+option(AX_ENABLE_LEGACY_IMAGE_FORMATS "Build PVR, KTX1, DDS, PKM, ASTC, ATITC, and TGA loaders" ON)
+option(AX_USE_BMP "Build BMP image decoding support" ON)
+option(AX_USE_JPEG "Build JPEG image decoding support" ON)
+option(AX_USE_WEBP "Build WebP image decoding support" ON)
 
 option(AX_ENABLE_3D "Build 3D support" ON)
+cmake_dependent_option(AX_ENABLE_GLTF "Build glTF 2.0 runtime loading support" ON "AX_ENABLE_3D" OFF)
+cmake_dependent_option(AX_ENABLE_LEGACY_3D "Build legacy OBJ, c3b/c3t, and auxiliary 3D nodes" ON "AX_ENABLE_3D" OFF)
 cmake_dependent_option(AX_ENABLE_PHYSICS_3D "Build Physics3D support" ON "AX_ENABLE_3D" OFF)
 cmake_dependent_option(AX_ENABLE_NAVMESH "Build NavMesh support" ON "AX_ENABLE_3D" OFF)
 
@@ -373,7 +379,7 @@ if(APPLE)
 endif()
 
 if(WASM)
-  if(${EMSCRIPTEN_VERSION} VERSION_GREATER_EQUAL "3.1.51")
+  if(${EMSCRIPTEN_VERSION} VERSION_GREATER_EQUAL "3.1.51" AND NOT AX_PROFILE_STYLIZED_WEB)
     target_link_options(${_AX_CORE_LIB} PUBLIC -sGL_ENABLE_GET_PROC_ADDRESS)
   endif()
 
@@ -394,6 +400,16 @@ if(IOS)
 endif()
 
 ax_find_shaders(${_AX_ROOT}/axmol/renderer/shaders _builtin_shaders)
+if(AX_PROFILE_STYLIZED_WEB)
+  set(_stylized_web_shaders)
+  foreach(_shader IN LISTS _builtin_shaders)
+    get_filename_component(_shader_name "${_shader}" NAME)
+    if(_shader_name IN_LIST AX_STYLIZED_WEB_SHADER_ALLOWLIST)
+      list(APPEND _stylized_web_shaders "${_shader}")
+    endif()
+  endforeach()
+  set(_builtin_shaders ${_stylized_web_shaders})
+endif()
 set(_AX_BUILTIN_SHADERS ${_builtin_shaders} CACHE STATIC "" FORCE)
 
 # configure engine builtin light num
@@ -432,19 +448,47 @@ set_source_files_properties(
   ${_AX_ROOT}/axmol/renderer/shaders/skinPositionNormalTexture.vert
   PROPERTIES AXSLCC_OUTPUT1 "USE_NORMAL_MAPPING=1"
 )
+set_source_files_properties(
+  ${_AX_ROOT}/axmol/renderer/shaders/stylized.frag
+  ${_AX_ROOT}/axmol/renderer/shaders/stylizedShadow.frag
+  PROPERTIES AXSLCC_OUTPUT1 "STYLIZED_ALPHA_CUTOUT=1"
+)
+if(AX_PROFILE_STYLIZED_WEB AND WASM)
+  set(_stylized_web_cold_sources
+    ${_AX_ROOT}/axmol/3d/GltfLoader.cpp
+  )
+  set_property(
+    SOURCE ${_stylized_web_cold_sources}
+    APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Release>:-Oz>"
+  )
+  set_property(
+    SOURCE ${_stylized_web_cold_sources}
+    PROPERTY SKIP_PRECOMPILE_HEADERS ON
+  )
+endif()
 ax_add_shader_target_for(${_AX_CORE_LIB} FILES ${_builtin_shaders} BUILTIN)
 
 ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_MFMEDIA)
+ax_config_pred(${_AX_CORE_LIB} AX_PROFILE_STYLIZED_WEB)
+ax_config_pred1(${_AX_CORE_LIB} AX_WASM_ENABLE_DEVTOOLS)
 ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_MSEDGE_WEBVIEW2)
 ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_PHYSICS_2D)
 ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_3D)
+ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_LEGACY_3D)
 ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_PHYSICS_3D)
 ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_NAVMESH)
 ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_VIDEO)
 ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_AUDIO)
+ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_LEGACY_IMAGE_FORMATS)
 ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_VR)
 ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_OPENXR)
 ax_config_pred(${_AX_CORE_LIB} AX_CORE_PROFILE)
+target_compile_definitions(${_AX_CORE_LIB}
+  PUBLIC
+    AX_USE_BMP=$<BOOL:${AX_USE_BMP}>
+    AX_USE_JPEG=$<BOOL:${AX_USE_JPEG}>
+    AX_USE_WEBP=$<BOOL:${AX_USE_WEBP}>
+)
 ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_WAYLAND)
 
 ax_config_pred1(${_AX_CORE_LIB} AX_ENABLE_D3D11)

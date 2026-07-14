@@ -27,6 +27,7 @@
 #include "axmol/rhi/Buffer.h"
 #include "axmol/rhi/GraphicsCore.h"
 #include "axmol/base/Utils.h"
+#include <algorithm>
 #include <stddef.h>
 
 namespace ax
@@ -83,11 +84,16 @@ void CustomCommand::assign(const CustomCommand& rhs)
 {
     if (this != &rhs)
     {
+        AX_SAFE_RELEASE(_vertexBuffer);
+        AX_SAFE_RELEASE(_instanceBuffer);
+        AX_SAFE_RELEASE(_indexBuffer);
+
         auto podOffset = offsetof(CustomCommand, _type);
         auto podSize   = offsetof(CustomCommand, _beforeCallback) - podOffset;
         memcpy((uint8_t*)this + podOffset, (const uint8_t*)&rhs + podOffset, podSize);
 
         AX_SAFE_RETAIN(_vertexBuffer);
+        AX_SAFE_RETAIN(_instanceBuffer);
         AX_SAFE_RETAIN(_indexBuffer);
 
         _beforeCallback = rhs._beforeCallback;
@@ -99,6 +105,10 @@ void CustomCommand::assign(CustomCommand&& rhs)
 {
     if (this != &rhs)
     {
+        AX_SAFE_RELEASE(_vertexBuffer);
+        AX_SAFE_RELEASE(_instanceBuffer);
+        AX_SAFE_RELEASE(_indexBuffer);
+
         auto podOffset = offsetof(CustomCommand, _type);
         auto podSize   = offsetof(CustomCommand, _beforeCallback) - podOffset;
         memcpy((uint8_t*)this + podOffset, (const uint8_t*)&rhs + podOffset, podSize);
@@ -106,9 +116,9 @@ void CustomCommand::assign(CustomCommand&& rhs)
         _beforeCallback = std::move(rhs._beforeCallback);
         _afterCallback  = std::move(rhs._afterCallback);
 
-        rhs._vertexBuffer = rhs._indexBuffer = nullptr;
-        rhs._pipelineDesc.programState       = nullptr;
-        rhs._pipelineDesc.vertexLayout       = nullptr;
+        rhs._vertexBuffer = rhs._instanceBuffer = rhs._indexBuffer = nullptr;
+        rhs._pipelineDesc.programState                             = nullptr;
+        rhs._pipelineDesc.vertexLayout                             = nullptr;
     }
 }
 #if defined(__INTEL_COMPILER)
@@ -157,14 +167,23 @@ void CustomCommand::createInstanceBuffer(size_t vertexSize, int capacity, Buffer
 
 void CustomCommand::setInstanceBuffer(rhi::Buffer* instanceBuffer, int count)
 {
+    AXASSERT(count >= 0, "Instance count cannot be negative");
+    if (!instanceBuffer)
+        count = 0;
+
     if (_instanceBuffer != instanceBuffer)
     {
         AX_SAFE_RELEASE(_instanceBuffer);
         _instanceBuffer   = instanceBuffer;
-        _instanceCount    = count;
         _instanceCapacity = count;
         AX_SAFE_RETAIN(_instanceBuffer);
     }
+    else if (_instanceBuffer)
+    {
+        _instanceCapacity = std::max(_instanceCapacity, count);
+    }
+
+    _instanceCount = count;
 }
 
 void CustomCommand::createIndexBuffer(IndexFormat format, size_t capacity, BufferUsage usage)

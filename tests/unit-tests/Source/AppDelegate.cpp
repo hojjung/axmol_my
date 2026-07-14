@@ -25,6 +25,7 @@
  THE SOFTWARE.
  ****************************************************************************/
 
+#include <cstdlib>
 #include <string>
 #include "doctest.h"
 #include "AppDelegate.h"
@@ -100,7 +101,18 @@ int AppDelegate::run(int argc, char** argv)
     }
     fflush(stdout);
 
+    const bool enableRhiIntegration = std::getenv("AX_UNIT_TEST_RHI") != nullptr;
+    if (enableRhiIntegration)
+    {
+        applicationWillLaunch();
+        auto contextAttrs    = Application::getContextAttrs();
+        contextAttrs.visible = false;
+        Application::setContextAttrs(contextAttrs);
+    }
+
     ax::Director::getInstance()->init();
+    if (enableRhiIntegration && !applicationDidFinishLaunching())
+        return 1;
 
     doctest::Context context;
 

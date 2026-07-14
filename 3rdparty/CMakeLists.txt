@@ -232,6 +232,13 @@ endif()
 ax_add_3rd(pugixml)
 ax_add_3rd(xxhash)
 
+if(AX_PROFILE_STYLIZED_WEB AND WASM)
+  # PNG and XML parsing are cold asset-loading paths. Keep the frame renderer
+  # at -O3 while compiling these libraries for the download-size budget.
+  target_compile_options(png PRIVATE "$<$<CONFIG:Release>:-Oz>")
+  target_compile_options(pugixml PRIVATE "$<$<CONFIG:Release>:-Oz>")
+endif()
+
 if(AX_WITH_FASTLZ)
   ax_add_3rd(fastlz)
 endif()
@@ -241,6 +248,18 @@ if(AX_WITH_CLIPPER2)
 endif()
 
 ax_add_3rd(ConvertUTF)
+
+if(AX_ENABLE_GLTF)
+  ax_add_3rd(meshoptimizer TARGETS meshoptimizer)
+  ax_add_3rd(basisu TARGETS basisu_transcoder)
+  target_include_directories(3rdparty INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/cgltf")
+  target_compile_definitions(3rdparty INTERFACE AX_ENABLE_GLTF=1 AX_ENABLE_KTX2=1)
+
+  if(AX_PROFILE_STYLIZED_WEB AND WASM)
+    target_compile_options(meshoptimizer PRIVATE "$<$<CONFIG:Release>:-Oz>")
+    target_compile_options(basisu_transcoder PRIVATE "$<$<CONFIG:Release>:-Oz>")
+  endif()
+endif()
 
 if(AX_WITH_POLY2TRI)
   ax_add_3rd(poly2tri)
@@ -347,7 +366,7 @@ if(AX_ENABLE_AUDIO)
 endif()
 
 if(WINDOWS OR LINUX OR ANDROID OR WASM)
-  if(AX_ENABLE_VK OR AX_ENABLE_GL)
+  if((AX_ENABLE_VK OR AX_ENABLE_GL) AND NOT (WASM AND AX_PROFILE_STYLIZED_WEB))
     ax_add_3rd(glad)
   endif()
 endif()

@@ -25,7 +25,12 @@
  ****************************************************************************/
 
 #include "axmol/3d/Animation3D.h"
-#include "axmol/3d/Bundle3D.h"
+#if defined(AX_ENABLE_LEGACY_3D) && AX_ENABLE_LEGACY_3D
+#    include "axmol/3d/Bundle3D.h"
+#endif
+#if defined(AX_ENABLE_GLTF) && AX_ENABLE_GLTF
+#    include "axmol/3d/GltfLoader.h"
+#endif
 #include "axmol/platform/FileUtils.h"
 #include "axmol/tlx/vector.hpp"
 #include "axmol/tlx/utility.hpp"
@@ -58,7 +63,22 @@ bool Animation3D::initWithFile(std::string_view filename, std::string_view anima
 {
     std::string fullPath = FileUtils::getInstance()->fullPathForFilename(filename);
 
-    // load animation here
+#if defined(AX_ENABLE_GLTF) && AX_ENABLE_GLTF
+    if (GltfLoader::isGltfPath(fullPath))
+    {
+        Animation3DData animationData;
+        if (GltfLoader::loadAnimation(fullPath, animationName, animationData) && init(animationData))
+        {
+            fullPath.append("#").append(animationName);
+            Animation3DCache::getInstance()->addAnimation(fullPath, this);
+            return true;
+        }
+        return false;
+    }
+#endif
+
+#if defined(AX_ENABLE_LEGACY_3D) && AX_ENABLE_LEGACY_3D
+    // Load legacy c3b/c3t animation data when that product feature is enabled.
     auto bundle = Bundle3D::createBundle();
     Animation3DData animationdata;
     if (bundle->load(fullPath) && bundle->loadAnimationData(animationName, &animationdata) && init(animationdata))
@@ -70,6 +90,7 @@ bool Animation3D::initWithFile(std::string_view filename, std::string_view anima
     }
 
     Bundle3D::destroyBundle(bundle);
+#endif
 
     return false;
 }
@@ -83,7 +104,7 @@ Animation3D::Curve* Animation3D::getBoneCurveByName(std::string_view name) const
     return nullptr;
 }
 
-Animation3D::Animation3D() : _duration(0) {}
+Animation3D::Animation3D() : _duration(0), _usesAbsoluteLocalTransforms(false) {}
 
 Animation3D::~Animation3D()
 {
@@ -106,7 +127,8 @@ Animation3D::Curve::~Curve()
 
 bool Animation3D::init(const Animation3DData& data)
 {
-    _duration = data._totalTime;
+    _duration                    = data._totalTime;
+    _usesAbsoluteLocalTransforms = data._usesAbsoluteLocalTransforms;
 
     {
         tlx::pod_vector<float> keys;

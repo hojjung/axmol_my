@@ -41,6 +41,9 @@
 #include "axmol/renderer/Pass.h"
 #include "xxhash/xxhash.h"
 
+#include <algorithm>
+#include <cstring>
+
 namespace ax
 {
 
@@ -62,16 +65,79 @@ MeshCommand::MeshCommand()
 void MeshCommand::init(float globalZOrder)
 {
     CustomCommand::init(globalZOrder);
+    _hasViewProjectionOverride = false;
 }
 
 void MeshCommand::init(float globalZOrder, const Mat4& transform)
 {
     CustomCommand::init(globalZOrder);
+    _hasViewProjectionOverride = false;
     if (Camera::getVisitingCamera())
     {
         _depth = Camera::getVisitingCamera()->getDepthInView(transform);
     }
     _mv = transform;
+}
+
+bool MeshCommand::captureProgramState(const rhi::ProgramState& programState)
+{
+    const auto& uniformBuffer = programState.getUniformBuffer();
+    _uniformSnapshot.resize(uniformBuffer.size());
+    if (!uniformBuffer.empty())
+        std::memcpy(_uniformSnapshot.data(), uniformBuffer.data(), uniformBuffer.size());
+
+    size_t textureCount = 0;
+    for (const auto& [location, bindingSet] : programState.getTextureBindingSets())
+        textureCount += std::min(bindingSet.slots.size(), bindingSet.texs.size());
+
+    if (textureCount > MAX_SNAPSHOT_TEXTURE_BINDINGS)
+    {
+        clearProgramStateSnapshot();
+        return false;
+    }
+
+    for (uint8_t index = 0; index < _textureSnapshotCount; ++index)
+        _textureSnapshot[index].texture.reset();
+    _textureSnapshotCount = 0;
+    for (const auto& [location, bindingSet] : programState.getTextureBindingSets())
+    {
+        const size_t count = std::min(bindingSet.slots.size(), bindingSet.texs.size());
+        for (size_t index = 0; index < count; ++index)
+        {
+            auto& snapshot                    = _textureSnapshot[_textureSnapshotCount++];
+            snapshot.location.location        = static_cast<int16_t>(location);
+            snapshot.location.runtimeLocation = static_cast<int16_t>(bindingSet.runtimeLocation);
+            snapshot.slot                     = bindingSet.slots[index];
+            snapshot.texture                  = bindingSet.texs[index];
+        }
+    }
+
+    _hasProgramStateSnapshot = true;
+    return true;
+}
+
+bool MeshCommand::restoreProgramState(rhi::ProgramState& programState) const
+{
+    if (!_hasProgramStateSnapshot ||
+        !programState.restoreUniformBuffer(_uniformSnapshot.data(), _uniformSnapshot.size()))
+    {
+        return false;
+    }
+
+    for (uint8_t index = 0; index < _textureSnapshotCount; ++index)
+    {
+        const auto& snapshot = _textureSnapshot[index];
+        programState.setTexture(snapshot.location, snapshot.slot, snapshot.texture.get());
+    }
+    return true;
+}
+
+void MeshCommand::clearProgramStateSnapshot() noexcept
+{
+    for (uint8_t index = 0; index < _textureSnapshotCount; ++index)
+        _textureSnapshot[index].texture.reset();
+    _textureSnapshotCount    = 0;
+    _hasProgramStateSnapshot = false;
 }
 
 MeshCommand::~MeshCommand()

@@ -169,6 +169,10 @@ public:
     /** Pops a group from the render queue */
     void popGroup();
 
+    /** Current command-group nesting depth, including the root queue. */
+    [[nodiscard]] size_t getCommandGroupDepth() const noexcept { return _commandGroupStack.size(); }
+    [[nodiscard]] int getCurrentCommandGroupId() const noexcept { return _commandGroupStack.top(); }
+
     /** Creates a render queue and returns its Id */
     int createRenderQueue();
 

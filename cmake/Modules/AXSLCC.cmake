@@ -14,17 +14,43 @@ axslcc_option(AXSLCC_VERT_SOURCE_FILE_EXTENSIONS ".vert;.vsh;.vs")
 axslcc_option(AXSLCC_OUT_DIR ${CMAKE_BINARY_DIR}/runtime/axslc)
 axslcc_option(AXSLCC_FIND_PROG_ROOT "")
 
-find_program(AXSLCC_EXE NAMES axslcc
-  PATHS ${AXSLCC_FIND_PROG_ROOT}
-)
+if(AXSLCC_FIND_PROG_ROOT)
+  find_program(AXSLCC_EXE NAMES axslcc
+    PATHS ${AXSLCC_FIND_PROG_ROOT}
+    NO_DEFAULT_PATH
+  )
+endif()
+if(NOT AXSLCC_EXE)
+  find_program(AXSLCC_EXE NAMES axslcc)
+endif()
 
 if(NOT AXSLCC_EXE)
   message(STATUS, "axslcc not found.")
   message(FATAL_ERROR "Please run setup.ps1 again to download axslcc, and run CMake again.")
 endif()
 
+execute_process(
+  COMMAND "${AXSLCC_EXE}" --version
+  RESULT_VARIABLE _AXSLCC_VERSION_RESULT
+  OUTPUT_VARIABLE _AXSLCC_VERSION_OUTPUT
+  ERROR_VARIABLE _AXSLCC_VERSION_ERROR
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+string(REGEX MATCH "axslcc v([0-9]+\\.[0-9]+\\.[0-9]+)" _AXSLCC_VERSION_MATCH
+  "${_AXSLCC_VERSION_OUTPUT}${_AXSLCC_VERSION_ERROR}")
+if(NOT _AXSLCC_VERSION_RESULT EQUAL 0 OR NOT _AXSLCC_VERSION_MATCH)
+  message(FATAL_ERROR "Unable to determine axslcc version from: ${AXSLCC_EXE}")
+endif()
+if(CMAKE_MATCH_1 VERSION_LESS 3.0.0)
+  message(FATAL_ERROR
+    "Axmol v3 requires axslcc 3.x; found ${CMAKE_MATCH_1} at ${AXSLCC_EXE}. "
+    "Delete the stale AXSLCC_EXE cache entry or select this checkout's bundled compiler.")
+endif()
+set(AXSLCC_VERSION "${CMAKE_MATCH_1}")
+
 message(STATUS "AXSLCC_OUT_DIR=${AXSLCC_OUT_DIR}")
 message(STATUS "AXSLCC_FIND_PROG_ROOT=${AXSLCC_FIND_PROG_ROOT}")
+message(STATUS "AXSLCC_EXE=${AXSLCC_EXE} (v${AXSLCC_VERSION})")
 message(STATUS "AXSLCC_FRAG_SOURCE_FILE_EXTENSIONS=${AXSLCC_FRAG_SOURCE_FILE_EXTENSIONS}")
 message(STATUS "AXSLCC_VERT_SOURCE_FILE_EXTENSIONS=${AXSLCC_VERT_SOURCE_FILE_EXTENSIONS}")
 

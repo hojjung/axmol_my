@@ -106,6 +106,9 @@ public:
 public:
     static void chooseSamplerDesc(bool antialiasEnabled, bool mipEnabled, rhi::SamplerDesc& desc);
 
+    /** Returns sampler state that never selects missing mip levels. */
+    [[nodiscard]] static TexParams resolveTexParameters(TexParams requested, bool hasMipmaps) noexcept;
+
     /**
      */
     Texture2D();
@@ -122,6 +125,7 @@ public:
     @param format Texture pixel formats.
     */
     bool initWithImage(Image* image, PixelFormat renderFormat = PixelFormat::NONE, bool autoGenMipmaps = false);
+    bool initWithImage(Image* image, PixelFormat renderFormat, bool autoGenMipmaps, rhi::ColorSpace colorSpace);
 
     /** Initializes a texture from a string with dimensions, alignment, font name and font size.
 
@@ -191,8 +195,9 @@ public:
                       rhi::PixelFormat renderFormat,
                       int pixelsWide,
                       int pixelsHigh,
-                      bool preMultipliedAlpha = false,
-                      bool autoGenMipmaps     = false);
+                      bool preMultipliedAlpha    = false,
+                      bool autoGenMipmaps        = false,
+                      rhi::ColorSpace colorSpace = rhi::ColorSpace::Linear);
 
     /** Initializes with mipmaps.
 
@@ -208,7 +213,8 @@ public:
                          rhi::PixelFormat renderFormat,
                          int pixelsWide,
                          int pixelsHigh,
-                         bool preMultipliedAlpha = false);
+                         bool preMultipliedAlpha    = false,
+                         rhi::ColorSpace colorSpace = rhi::ColorSpace::Linear);
 
     bool initWithSpec(rhi::TextureDesc desc,
                       std::span<const TextureSliceData> subDatas,

@@ -155,6 +155,19 @@ void ProgramManager::init()
                     colorNormalTexture_frag_1, VertexLayoutKind::Invalid);
     registerProgram(ProgramType::SKINPOSITION_BUMPEDNORMAL_TEXTURE_3D, skinPositionNormalTexture_vert_1,
                     colorNormalTexture_frag_1, VertexLayoutKind::Invalid);
+    registerProgram(ProgramType::STYLIZED_3D, stylized_vert, stylized_frag, VertexLayoutKind::Invalid);
+    registerProgram(ProgramType::STYLIZED_CUTOUT_3D, stylized_vert, stylizedCutout_frag, VertexLayoutKind::Invalid);
+    registerProgram(ProgramType::STYLIZED_SKIN_3D, stylizedSkin_vert, stylized_frag, VertexLayoutKind::Invalid);
+    registerProgram(ProgramType::STYLIZED_SKIN_CUTOUT_3D, stylizedSkin_vert, stylizedCutout_frag,
+                    VertexLayoutKind::Invalid);
+    registerProgram(ProgramType::STYLIZED_SHADOW_3D, stylizedShadow_vert, stylizedShadow_frag,
+                    VertexLayoutKind::Invalid);
+    registerProgram(ProgramType::STYLIZED_SHADOW_CUTOUT_3D, stylizedShadow_vert, stylizedShadowCutout_frag,
+                    VertexLayoutKind::Invalid);
+    registerProgram(ProgramType::STYLIZED_SHADOW_SKIN_3D, stylizedShadowSkin_vert, stylizedShadow_frag,
+                    VertexLayoutKind::Invalid);
+    registerProgram(ProgramType::STYLIZED_SHADOW_SKIN_CUTOUT_3D, stylizedShadowSkin_vert, stylizedShadowCutout_frag,
+                    VertexLayoutKind::Invalid);
     registerProgram(ProgramType::TERRAIN_3D, terrain_vert, terrain_frag, VertexLayoutKind::Terrain3D);
     registerProgram(ProgramType::PARTICLE_TEXTURE_3D, particle_vert, particleTexture_frag,
                     VertexLayoutKind::PosUvColor);

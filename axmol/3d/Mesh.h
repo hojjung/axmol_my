@@ -25,6 +25,7 @@
  ****************************************************************************/
 #pragma once
 
+#include <array>
 #include <string>
 #include <map>
 
@@ -53,6 +54,8 @@ class Material;
 class Renderer;
 class Scene;
 class Pass;
+class StylizedMaterial;
+class StylizedRenderer;
 
 namespace rhi
 {
@@ -65,6 +68,7 @@ class Buffer;
 class AX_DLL Mesh : public Object
 {
     friend class MeshRenderer;
+    friend class StylizedRenderer;
 
 public:
     /**create mesh from positions, normals, and so on, single SubMesh*/
@@ -227,7 +231,8 @@ public:
               unsigned int lightMask,
               const Vec4& color,
               bool forceDepthWrite,
-              bool wireframe);
+              bool wireframe,
+              Scene* scene = nullptr);
 
     /**skin setter*/
     void setSkin(MeshSkin* skin);
@@ -280,6 +285,21 @@ public:
 protected:
     void resetLightUniformValues();
     void setLightUniforms(Pass* pass, Scene* scene, const Vec4& color, unsigned int lightmask);
+    void setStylizedLightUniforms(Pass* pass,
+                                  Scene* scene,
+                                  const StylizedMaterial& material,
+                                  unsigned int lightmask,
+                                  const Mat4& transform);
+    void drawStylizedShadow(Renderer& renderer,
+                            const StylizedMaterial& sourceMaterial,
+                            const std::array<int, 2>& cascadeQueueIds,
+                            const std::array<Mat4, 2>& lightViewProjection,
+                            uint8_t cascadeCount,
+                            const Mat4& transform,
+                            const Vec4& color,
+                            uint64_t resourceGeneration);
+    bool prepareInstanceData(bool identityInstanceRequired);
+    bool ensureStylizedShadowMaterial(const StylizedMaterial& sourceMaterial, uint64_t resourceGeneration);
     void bindMeshCommand();
     tlx::hash_map<NTextureData::Usage, Texture2D*> _textures;  // textures that submesh is using
     MeshSkin* _skin;                                           // skin
@@ -304,6 +324,10 @@ protected:
     AABB _aabb;
     std::function<void()> _visibleChanged;
     tlx::string_map<std::vector<MeshCommand>> _meshCommands;
+    Material* _stylizedShadowMaterial = nullptr;
+    std::array<MeshCommand, 2> _stylizedShadowCommands;
+    uint32_t _stylizedShadowProgramType = 0;
+    uint64_t _stylizedShadowGeneration  = 0;
 
     /// light parameters
     std::vector<Vec3> _dirLightUniformColorValues;

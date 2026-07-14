@@ -23,16 +23,9 @@
  THE SOFTWARE.
  ****************************************************************************/
 
-#include <list>
-#include <fstream>
-#include <iostream>
-#include <sstream>
-
 #include "axmol/3d/MeshVertexIndexData.h"
-#include "axmol/3d/ObjLoader.h"
 #include "axmol/3d/MeshMaterial.h"
 #include "axmol/3d/Mesh.h"
-#include "axmol/3d/Bundle3D.h"
 
 #include "axmol/base/Macros.h"
 #include "axmol/base/CustomEvent.h"
@@ -48,6 +41,19 @@ using namespace std;
 
 namespace ax
 {
+namespace
+{
+AABB calculateAABB(std::span<const float> vertices, int strideInBytes, const MeshData::IndexArray& indices)
+{
+    AABB aabb;
+    const size_t stride = static_cast<size_t>(strideInBytes) / sizeof(float);
+    indices.for_each([&](uint32_t index) {
+        const Vec3 point(vertices[index * stride], vertices[index * stride + 1], vertices[index * stride + 2]);
+        aabb.updateMinMax(&point, 1);
+    });
+    return aabb;
+}
+}  // namespace
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 MeshIndexData* MeshIndexData::create(std::string_view id,
@@ -145,7 +151,7 @@ MeshVertexData* MeshVertexData::create(const MeshData& meshdata, CustomCommand::
         MeshIndexData* indexdata = nullptr;
         if (needCalcAABB)
         {
-            auto aabb = Bundle3D::calculateAABB(meshdata.vertex, meshdata.getPerVertexSize(), indices);
+            auto aabb = calculateAABB(meshdata.vertex, meshdata.getPerVertexSize(), indices);
             indexdata = MeshIndexData::create(id, vertexdata, indexBuffer, aabb);
         }
         else
