@@ -2,6 +2,8 @@
 
 이 문서는 Axmol v3의 경량 Forward 카툰 렌더링 경로와 에셋 계약을 설명한다. 제품 기준선은 WebGL2이며, 셰이더 원본은 Axmol v3의 GLSL ES 3.10 소스로 유지한다. 현재 기준선의 `_AX_MIN_CXX_STD`는 23이므로 엔진과 host tool도 C++23으로 빌드한다. 승인안의 C++20 전제 때문에 실제 v3 기준선을 다운그레이드하지 않았다.
 
+초기 제품 의도, 구현 중 개선한 설계, 검증 증거와 다음 작업 순서는 [CartoonRendererHandoff.md](./CartoonRendererHandoff.md)를 함께 참고한다.
+
 ## 렌더링 구조
 
 한 번의 Scene traversal에서 다음 순서로 명령을 제출한다.
