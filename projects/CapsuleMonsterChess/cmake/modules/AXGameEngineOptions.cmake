@@ -1,47 +1,77 @@
-# NOTE: Changing the value of AX_EXT_HINT after cmake build files have been created
-# will not update all other options that are using AX_EXT_HINT.  You must delete the
-# {build_dir}/CMakeCache.txt file and then re-run the `axmol build ...` command in
-# order for the new setting to take effect. Alternatively, you can also delete the
-# entire build folder and then re-run the `axmol build` command.
-# set(AX_EXT_HINT ON CACHE BOOL "The default extensions hint" FORCE)
+# Capsule Monster Chess uses Axmol as a focused 3D/glTF client runtime.
+# Keep this list authoritative so cached native and Web builds cannot silently
+# re-enable optional engine modules.
 
-# The following are by default set the same as the AX_EXT_HINT flag above - default: ON
-# Uncomment the lines below to set them individually
-# set(AX_ENABLE_EXT_LUA OFF CACHE BOOL "Build lua libraries" FORCE)
-# set(AX_ENABLE_EXT_GUI OFF CACHE BOOL "Build extension GUI" FORCE)
-# set(AX_ENABLE_EXT_ASSETMANAGER OFF CACHE BOOL "Build extension asset-manager" FORCE)
-# set(AX_ENABLE_EXT_SPINE OFF CACHE BOOL "Build extension spine" FORCE)
-# set(AX_ENABLE_EXT_DRAGONBONES OFF CACHE BOOL "Build extension DragonBones" FORCE)
-# set(AX_ENABLE_EXT_COCOSTUDIO OFF CACHE BOOL "Build extension cocostudio" FORCE)
-# set(AX_ENABLE_EXT_FAIRYGUI OFF CACHE BOOL "Build extension FairyGUI" FORCE)
-# set(AX_ENABLE_EXT_IMGUI OFF CACHE BOOL "Build extension ImGui" FORCE)
-# set(AX_ENABLE_EXT_JSONDEFAULT OFF CACHE BOOL "Build extension JSONDefault" FORCE)
+option(CMC_ENABLE_AUDIO "Build the client audio module" OFF)
 
-# 3D Support - - default: ON
-# set(AX_ENABLE_3D ON CACHE BOOL "Build 3D support" FORCE)
-# These depend on AX_EXT_HINT & AX_ENABLE_3D
-# set(AX_ENABLE_EXT_PARTICLE3D ON CACHE BOOL "Build extension Particle3D" FORCE)
-# set(AX_ENABLE_PHYSICS_3D ON CACHE BOOL "Build Physics3D support" FORCE)
-# set(AX_ENABLE_NAVMESH ON CACHE BOOL "Build NavMesh support" FORCE)
+set(_CMC_AXMOL_ENABLED_FEATURES
+  AX_ENABLE_3D
+  AX_ENABLE_GLTF
+  AX_ENABLE_HTTP
+  AX_WITH_CURL
+  AX_WITH_LLHTTP
+  AX_WITH_UNZIP
+  AX_WITH_CLIPPER2
+  AX_WITH_POLY2TRI
+  # Axmol's core Image object still references the ASTC decoder even when
+  # legacy format detection is disabled. Keep its link dependency until that
+  # engine source boundary is separated.
+  AX_WITH_ASTCENC
+  AX_CORE_PROFILE
+)
 
-# Physics 2D Support - - default: ON
-# set(AX_ENABLE_PHYSICS_2D ON CACHE BOOL "Build Physics support" FORCE)
-# These depend on AX_EXT_HINT & AX_ENABLE_PHYSICS
-# set(AX_ENABLE_EXT_PHYSICS_NODE ON CACHE BOOL "Build extension physics-nodes" FORCE)
+set(_CMC_AXMOL_DISABLED_FEATURES
+  AX_ENABLE_PHYSICS_2D
+  AX_ENABLE_PHYSICS_3D
+  AX_ENABLE_NAVMESH
+  AX_ENABLE_LEGACY_3D
+  AX_ENABLE_LEGACY_IMAGE_FORMATS
+  AX_ENABLE_VIDEO
+  AX_ENABLE_MFMEDIA
+  AX_ENABLE_VLC_MEDIA
+  AX_ENABLE_MSEDGE_WEBVIEW2
+  AX_ENABLE_AUDIO
+  AX_ENABLE_OPUS
+  AX_ENABLE_WEBSOCKET
+  AX_ENABLE_VR
+  AX_ENABLE_OPENXR
+  AX_USE_BMP
+  AX_USE_JPEG
+  AX_USE_WEBP
+  AX_WITH_JPEG
+  AX_WITH_WEBP
+  AX_WITH_FASTLZ
+  AX_WITH_WEBSOCKET_PARSER
+  AX_WITH_DOCTEST
+  AX_EXT_HINT
+  AX_ENABLE_EXT_LUA
+  AX_ENABLE_EXT_GUI
+  AX_ENABLE_EXT_ASSETMANAGER
+  AX_ENABLE_EXT_SPINE
+  AX_ENABLE_EXT_DRAGONBONES
+  AX_ENABLE_EXT_SCENEIO
+  AX_ENABLE_EXT_SCENEEXT
+  AX_ENABLE_EXT_FAIRYGUI
+  AX_ENABLE_EXT_IMGUI
+  AX_ENABLE_EXT_LIVE2D
+  AX_ENABLE_EXT_EFFEKSEER
+  AX_ENABLE_EXT_PARTICLE3D
+  AX_ENABLE_EXT_PHYSICS_NODE
+  AX_ENABLE_EXT_INSPECTOR
+  AX_ENABLE_EXT_SDFGEN
+  AX_ENABLE_EXT_JSONDEFAULT
+)
 
-# These depend on AX_EXT_HINT & AX_ENABLE_EXT_IMGUI - default: ON
-# set(AX_ENABLE_EXT_INSPECTOR ON CACHE BOOL "Enable extension Inspector" FORCE)
-# set(AX_ENABLE_EXT_SDFGEN ON CACHE BOOL "Build extension SDFGen" FORCE)
+foreach(_cmc_feature IN LISTS _CMC_AXMOL_ENABLED_FEATURES)
+  set(${_cmc_feature} ON CACHE BOOL "Required by Capsule Monster Chess" FORCE)
+endforeach()
 
-# The follow options are set individually - default: OFF
-# set(AX_ENABLE_EXT_LIVE2D OFF CACHE BOOL "Build extension Live2D" FORCE)
-# set(AX_ENABLE_EXT_EFFEKSEER OFF CACHE BOOL "Build extension Effekseer" FORCE)
+foreach(_cmc_feature IN LISTS _CMC_AXMOL_DISABLED_FEATURES)
+  set(${_cmc_feature} OFF CACHE BOOL "Not used by Capsule Monster Chess" FORCE)
+endforeach()
 
-# Code modules that can be disabled - default: ON
-# set(AX_ENABLE_AUDIO ON CACHE BOOL "Build audio support" FORCE)
-# set(AX_ENABLE_WEBSOCKET ON CACHE BOOL "Build Websocket client based on yasio" FORCE)
-# set(AX_ENABLE_HTTP ON CACHE BOOL "Build HTTP client based on yasio" FORCE)
-# set(AX_ENABLE_OPUS ON CACHE BOOL "Build with opus support" FORCE)
+set(AX_ENABLE_AUDIO ${CMC_ENABLE_AUDIO} CACHE BOOL "Build the client audio module" FORCE)
 
-# WEBVIEW2 - default: ON for WIN32 and WINRT
-# set(AX_ENABLE_MSEDGE_WEBVIEW2 ON CACHE BOOL "Disable msedge webview2")
+unset(_cmc_feature)
+unset(_CMC_AXMOL_ENABLED_FEATURES)
+unset(_CMC_AXMOL_DISABLED_FEATURES)

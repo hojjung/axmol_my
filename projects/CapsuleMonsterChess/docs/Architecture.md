@@ -31,26 +31,32 @@ pthread WebAssembly는 cross-origin isolation이 필수다. Firebase Hosting에
 CapsuleMonsterChess/
   Source/                 Axmol 클라이언트, UI, 렌더, 실행/네트워크 어댑터
   GameCore/               순수 결정적 C++17 전투 규칙
-  Server/                 headless HTTP/Cloud Run 어댑터
+  Server/                 선택 Axmol core 소스 기반 headless HTTP/Cloud Run 서버
   Backend/                Firebase Functions와 보안 규칙
   Content/Data/Tables/    클라이언트·서버 공용 canonical JSON
   Tests/GameCore/         결정성·육각 보드·Unity golden tests
   docs/                   기획, 포팅, 마일스톤
 ```
 
-`GameCore`는 Axmol, HTTP, Firebase, 파일 시스템을 알지 못한다. ExaStudio에서는 Boost.Asio/Beast,
-nlohmann JSON, BS thread pool, mbedTLS, FlatBuffers를 필요한 것만 독립 타깃으로 가져올 수 있다.
-기존 `exaNetwork` 전체는 엔진 의존성과 미완성 서버 경로가 있으므로 링크하지 않는다. 첫 버전은
-JSON + HTTPS만 사용하고 FlatBuffers는 측정 후 도입한다.
+`GameCore`는 Axmol, HTTP, Firebase, 파일 시스템을 알지 못한다. 서버는 전체 `axmol` 타깃 대신
+Scheduler, fixed-priority CustomEvent와 객체 수명 관리 소스만 `cmc_axmol_headless`로 컴파일한다.
+Director, Scene, Renderer/RHI, UI, 입력 코드는 링크하지 않는다. ExaStudio에서는 header-only
+Boost.Asio/Beast, nlohmann JSON, Mbed TLS `sha256.c`만 가져오며 `exaNetwork`, BS thread pool, curl,
+FlatBuffers는 현재 서버에 넣지 않는다. 외부 요청의 HTTPS는 Cloud Run이 종료하고 컨테이너는 HTTP로
+수신한다.
 
 Firebase C++ SDK는 WebAssembly를 지원하지 않는다. Web은 modular Firebase JavaScript SDK로 Auth,
 App Check, callable을 처리하고 얇은 C ABI/`EM_JS` bridge로 C++에 결과만 넘긴다. Android/iOS는
 Firebase C++ SDK adapter를 사용한다. 상위 코드는 `IIdentityService`와 `IBackendClient`만 보며,
 두 adapter 모두 `Source/Platform` 아래에 둔다.
 
+Firebase Admin SDK에는 공식 C++ 구현이 없으므로 C++ 전투 서버에 비공식 Firebase 클라이언트를 넣지
+않는다. TypeScript Firebase Function이 Admin SDK로 Auth/Firestore를 처리하고, IAM 인증된 내부 HTTP로
+전투 서버를 호출한다.
+
 ## 전투 실행 경계
 
-실행 모드는 `Source/Client`의 coordinator 입력이고 simulator 내부 규칙은 아니다.
+아래 실행 모드 경계는 `Source/Client` coordinator의 목표 API이며 simulator 내부 규칙은 아니다.
 
 ```cpp
 enum class BattleExecutionMode : std::uint8_t
@@ -75,8 +81,16 @@ BattleResult BattleSimulator::Run(
 
 결정성을 위해 fixed tick, stable iteration order, 명시적 RNG를 사용하고 wall clock과 전역 상태를
 금지한다. 전투 수치는 정수 또는 명시적 fixed-point로 계산하고, hash 입력은 endian과 필드 순서를
-고정한 canonical bytes로 직렬화한다. 결과에는 `matchId`, `rulesVersion`, `contentHash`, `seed`,
-`resultHash`를 기록한다.
+고정한 canonical bytes로 직렬화한다. 현재 서버 응답에는 `requestId`, `battleId`, `tableVersion`,
+`contentHash`, `hasWinner`, `winnerTeam`, `durationTicks`, `checksum`, `events`, `finalState`를 기록한다.
+
+클라이언트 표현 tick은 Axmol Scheduler의 `scheduleUpdate()` / `update(dt)` / `unscheduleUpdate()` 경로,
+지연 실행은 `Node::scheduleOnce`, 화면 이벤트 전달은 `EventDispatcher::dispatchCustomEvent`,
+이동·공격·사망 연출은 Actions를 사용한다. 별도 범용 스케줄러나
+디스패처는 만들지 않는다. 단, 서버가 반환해야 하는 `BattleLogEvent`와 동일 tick 내 명령 순서,
+체크섬용 정수 simulation tick은 엔진 이벤트 기능이 제공하지 않는 게임 도메인 데이터이므로 GameCore에
+남긴다. 서버의 Scheduler/EventDispatcher는 여러 worker가 직접 공유하지 않고 프로세스 런타임의 단일
+Boost.Asio strand에서만 구동한다.
 
 ## 서버 판정 흐름
 
@@ -84,7 +98,8 @@ BattleResult BattleSimulator::Run(
    ID token, App Check, 클라이언트 버전을 다시 강제한다.
 2. 클라이언트가 재시도용 `requestId`를 보내면 서버가 Firebase UID와 묶어 idempotency key를 만든다.
 3. 첫 Firestore transaction에서 해당 key의 match를 create-if-absent 하고 실제 덱·레벨·장비를
-   읽어 입장권/피로도를 차감한 뒤, 불변 snapshot과 서버 seed를 가진 `Pending` match를 만든다.
+   읽어 입장권/피로도를 차감한다. 클라이언트 seed는 폐기하고 불변 snapshot과 서버 생성 seed를 가진
+   `Pending` match를 만든다.
 4. private Cloud Run이 서버 테이블로 능력치를 조립하고 GameCore로 전투 전체를 계산한다.
 5. 두 번째 transaction이 아직 `Pending`인 같은 match에만 결과·MMR·보상을 반영한다.
 6. 호출 실패 시 같은 `requestId`를 재시도하고, 클라이언트는 확정된 이벤트만 화면 시간에 맞춰 재생한다.
@@ -116,10 +131,14 @@ content hash를 붙인 뒤에만 `public, max-age=31536000, immutable`을 사용
 - [Firebase callable 인증 정보](https://firebase.google.com/docs/functions/callable)
 - [Firebase C++ 지원 플랫폼](https://firebase.google.com/docs/cpp/learn-more)
 - [Firebase Web SDK](https://firebase.google.com/docs/web/learn-more)
+- [Firebase Admin SDK 설정 및 지원 언어](https://firebase.google.com/docs/admin/setup)
 - [Cloud Run 서비스 간 인증](https://docs.cloud.google.com/run/docs/authenticating/service-to-service)
+- [Cloud Run 컨테이너 런타임 계약](https://docs.cloud.google.com/run/docs/container-contract)
 - [Firestore transaction](https://firebase.google.com/docs/firestore/manage-data/transactions)
 - [Firebase Hosting CDN](https://firebase.google.com/docs/hosting/quickstart)
 - [Firebase Hosting 헤더 설정](https://firebase.google.com/docs/hosting/full-config#headers)
 - [Emscripten pthread 배포 요구사항](https://emscripten.org/docs/porting/pthreads.html)
+- [Axmol Scheduler](https://axmol.dev/manual/latest/db/dfa/classax_1_1_scheduler.html)
+- [Axmol EventDispatcher](https://axmol.dev/manual/latest/de/d23/classax_1_1_event_dispatcher.html)
 - [Firestore 위치](https://firebase.google.com/docs/firestore/locations)
 - [Amazon ECS 서비스](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs_services.html)

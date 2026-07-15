@@ -74,6 +74,8 @@ DerivedData/
 
 # Licensed source-derived assets are generated locally and never committed.
 /Content/Local/
+/Content/UI/MonsterIcons/*.png
+/Content/UI/LobbyFeatures/**/*.png
 
 # Ignore files built by AppCode
 .idea/

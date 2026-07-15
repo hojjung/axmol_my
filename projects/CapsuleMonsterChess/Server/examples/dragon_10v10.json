@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "requestId": "local-smoke-1",
+  "battleId": "dragon-10v10-1",
+  "uid": "firebase-local-user",
+  "seed": 4410787,
+  "tableVersion": "monster.v1.4ef396173938",
+  "contentHash": "4ef3961739384773c044e9aead83170dfacde5ce4d4c4e21f22a89c8b431bc7f",
+  "playerUnits": [
+    {"runtimeUnitId": 101, "catalogUnitId": 49, "x": 0, "z": 0},
+    {"runtimeUnitId": 102, "catalogUnitId": 49, "x": 0, "z": 1},
+    {"runtimeUnitId": 103, "catalogUnitId": 49, "x": 0, "z": 2},
+    {"runtimeUnitId": 104, "catalogUnitId": 49, "x": 0, "z": 3},
+    {"runtimeUnitId": 105, "catalogUnitId": 49, "x": 0, "z": 4},
+    {"runtimeUnitId": 106, "catalogUnitId": 49, "x": 1, "z": 0},
+    {"runtimeUnitId": 107, "catalogUnitId": 49, "x": 1, "z": 1},
+    {"runtimeUnitId": 108, "catalogUnitId": 49, "x": 1, "z": 2},
+    {"runtimeUnitId": 109, "catalogUnitId": 49, "x": 1, "z": 3},
+    {"runtimeUnitId": 110, "catalogUnitId": 49, "x": 1, "z": 4}
+  ],
+  "enemyUnits": [
+    {"runtimeUnitId": 201, "catalogUnitId": 49, "x": 8, "z": 0},
+    {"runtimeUnitId": 202, "catalogUnitId": 49, "x": 8, "z": 1},
+    {"runtimeUnitId": 203, "catalogUnitId": 49, "x": 8, "z": 2},
+    {"runtimeUnitId": 204, "catalogUnitId": 49, "x": 8, "z": 3},
+    {"runtimeUnitId": 205, "catalogUnitId": 49, "x": 8, "z": 4},
+    {"runtimeUnitId": 206, "catalogUnitId": 49, "x": 9, "z": 0},
+    {"runtimeUnitId": 207, "catalogUnitId": 49, "x": 9, "z": 1},
+    {"runtimeUnitId": 208, "catalogUnitId": 49, "x": 9, "z": 2},
+    {"runtimeUnitId": 209, "catalogUnitId": 49, "x": 9, "z": 3},
+    {"runtimeUnitId": 210, "catalogUnitId": 49, "x": 9, "z": 4}
+  ]
+}

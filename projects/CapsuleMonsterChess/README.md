@@ -15,7 +15,24 @@ JMO ramp/diffuse tint와 AC directional rim/SSS 특성을 런타임 파라미터
 - `Tests/GameCore`: 결정성, 육각 보드, Unity golden tests
 
 기획과 구현 순서는 [GameDesign](docs/GameDesign.md), [Architecture](docs/Architecture.md),
-[Milestone 01](docs/Milestone01.md), [Unity Port Map](docs/UnityPortMap.md)을 기준으로 한다.
+[Milestone 01](docs/Milestone01.md), [Unity Port Map](docs/UnityPortMap.md)을 기준으로 한다. 헤드리스 빌드와
+HTTP 계약은 [Server](Server/README.md), 클라이언트·서버 모듈 경계와 삭제 목록은
+[Axmol Runtime Module Profile](docs/AxmolModuleProfile.md)에 있다.
+
+## Axmol 모듈 경계
+
+클라이언트 기능 스위치는
+[`cmake/modules/AXGameEngineOptions.cmake`](cmake/modules/AXGameEngineOptions.cmake)가 단일 기준이다.
+코어 2D UI, 3D/glTF, KTX2/BasisU와 HTTP/Downloader만 유지하고 Box2D, Jolt, Recast, WebSocket,
+영상, 오디오와 미사용 확장을 빌드에서 제외한다. 사운드 구현을 시작할 때만
+`-DCMC_ENABLE_AUDIO=ON`으로 오디오 모듈을 다시 켠다.
+
+모바일 텍스처는 KTX2/Basis Universal 한 벌을 배포하고, 런타임에서 ASTC 우선, ETC2·BC3·RGBA8
+순으로 기기 지원 포맷에 전사한다. 정확한 유지·삭제 목록과 `AX_WITH_ASTCENC` 예외는
+[Axmol Runtime Module Profile](docs/AxmolModuleProfile.md)을 따른다.
+
+서버는 전체 Axmol target을 링크하지 않는다. `Server/CMakeLists.txt`의 allowlist에 있는 Scheduler,
+fixed-priority CustomEvent와 객체 수명 소스만 직접 컴파일한다.
 
 ## 로컬 자산 변환
 

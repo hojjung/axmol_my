@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "authoritative": false,
+    "note": "Local UI-only seed. Unity contains visual assets but no quest or season master data."
+  },
+  "quests": [
+    {
+      "questId": 101,
+      "prerequisiteQuestId": 0,
+      "category": "DAILY",
+      "title": "CHECK THE SHOP",
+      "description": "Visit the shop once.",
+      "target": 1,
+      "rewardType": "GOLD",
+      "rewardAmount": 50
+    },
+    {
+      "questId": 102,
+      "prerequisiteQuestId": 101,
+      "category": "DAILY",
+      "title": "TRAIN FIVE UNITS",
+      "description": "Use five units in your active deck.",
+      "target": 5,
+      "rewardType": "ENERGY",
+      "rewardAmount": 10
+    },
+    {
+      "questId": 103,
+      "prerequisiteQuestId": 102,
+      "category": "DAILY",
+      "title": "OPEN A CAPSULE",
+      "description": "Acquire one unit from the shop capsule.",
+      "target": 1,
+      "rewardType": "GEMS",
+      "rewardAmount": 5
+    },
+    {
+      "questId": 201,
+      "prerequisiteQuestId": 0,
+      "category": "CAREER",
+      "title": "FIRST FORMATION",
+      "description": "Complete an active deck with five units.",
+      "target": 5,
+      "rewardType": "GOLD",
+      "rewardAmount": 100
+    },
+    {
+      "questId": 202,
+      "prerequisiteQuestId": 201,
+      "category": "CAREER",
+      "title": "UNIT COLLECTOR",
+      "description": "Own ten different monsters.",
+      "target": 10,
+      "rewardType": "GEMS",
+      "rewardAmount": 10
+    },
+    {
+      "questId": 203,
+      "prerequisiteQuestId": 202,
+      "category": "CAREER",
+      "title": "STORY EXPLORER",
+      "description": "Clear three story stages.",
+      "target": 3,
+      "rewardType": "ENERGY",
+      "rewardAmount": 15
+    },
+    {
+      "questId": 301,
+      "prerequisiteQuestId": 0,
+      "category": "SEASON",
+      "title": "BATTLE PASS START",
+      "description": "Earn twenty-five pass points.",
+      "target": 25,
+      "rewardType": "GOLD",
+      "rewardAmount": 150
+    },
+    {
+      "questId": 302,
+      "prerequisiteQuestId": 301,
+      "category": "SEASON",
+      "title": "AUTO BATTLE VETERAN",
+      "description": "Complete ten battles this season.",
+      "target": 10,
+      "rewardType": "GEMS",
+      "rewardAmount": 20
+    },
+    {
+      "questId": 303,
+      "prerequisiteQuestId": 302,
+      "category": "SEASON",
+      "title": "DECK SPECIALIST",
+      "description": "Use three different deck presets.",
+      "target": 3,
+      "rewardType": "ENERGY",
+      "rewardAmount": 20
+    }
+  ],
+  "battlePass": {
+    "seasonId": 1,
+    "name": "FOUNDERS PASS",
+    "subtitle": "ADVENTURE AWAITS!",
+    "pointsPerTier": 25,
+    "seasonEndsLabel": "DEV SEASON - 13 DAYS LEFT",
+    "tiers": [
+      { "tier": 1, "freeReward": "100 GOLD", "premiumReward": "RARE CHEST" },
+      { "tier": 2, "freeReward": "10 ENERGY", "premiumReward": "10 GEMS" },
+      { "tier": 3, "freeReward": "UNIT SHARDS", "premiumReward": "GOLD CHEST" },
+      { "tier": 4, "freeReward": "150 GOLD", "premiumReward": "RARE CHEST" },
+      { "tier": 5, "freeReward": "15 ENERGY", "premiumReward": "EPIC CHEST" },
+      { "tier": 6, "freeReward": "UNIT SHARDS", "premiumReward": "25 GEMS" },
+      { "tier": 7, "freeReward": "200 GOLD", "premiumReward": "GOLD CHEST" },
+      { "tier": 8, "freeReward": "20 ENERGY", "premiumReward": "EPIC CHEST" }
+    ]
+  }
+}

@@ -101,8 +101,8 @@ bool AppDelegate::applicationDidFinishLaunching()
     {
 #if (AX_TARGET_PLATFORM == AX_PLATFORM_WIN32) || (AX_TARGET_PLATFORM == AX_PLATFORM_MAC) || \
     (AX_TARGET_PLATFORM == AX_PLATFORM_LINUX)
-        renderView = RenderView::createWithRect(
-            "CapsuleMonsterChess", ax::Rect(0, 0, desktopWindowSize.width, desktopWindowSize.height));
+        renderView = RenderView::createWithRect("CapsuleMonsterChess",
+                                                ax::Rect(0, 0, desktopWindowSize.width, desktopWindowSize.height));
 #elif AX_TARGET_PLATFORM == AX_PLATFORM_WASM
         renderView = RenderView::createWithRect(
             "CapsuleMonsterChess", ax::Rect(0, 0, designResolutionSize.width, designResolutionSize.height));
@@ -121,8 +121,7 @@ bool AppDelegate::applicationDidFinishLaunching()
 #    endif
 #endif
 
-    // turn on display FPS
-    director->setStatsDisplay(true);
+    director->setStatsDisplay(false);
 
     // set FPS. the default value is 1.0/60 if you don't call this
     director->setAnimationInterval(1.0f / 30);

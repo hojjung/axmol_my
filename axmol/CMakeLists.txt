@@ -383,7 +383,9 @@ if(WASM)
     target_link_options(${_AX_CORE_LIB} PUBLIC -sGL_ENABLE_GET_PROC_ADDRESS)
   endif()
 
-  target_link_options(${_AX_CORE_LIB} PUBLIC -lwebsocket.js)
+  if(AX_ENABLE_WEBSOCKET)
+    target_link_options(${_AX_CORE_LIB} PUBLIC -lwebsocket.js)
+  endif()
 
   if(AX_WASM_TIMING_USE_TIMEOUT)
     target_compile_definitions(${_AX_CORE_LIB} PUBLIC AX_WASM_TIMING_USE_TIMEOUT=1)

@@ -28,8 +28,11 @@ THE SOFTWARE.
 #include "axmol/base/Object.h"
 #include "axmol/base/AutoreleasePool.h"
 #include "axmol/base/Macros.h"
-#include "axmol/base/ScriptSupport.h"
 #include "axmol/base/WeakPtr.h"
+
+#if AX_ENABLE_SCRIPT_BINDING
+#    include "axmol/base/ScriptSupport.h"
+#endif
 
 #if AX_OBJECT_LEAK_DETECTION
 #    include <algorithm>  // std::find

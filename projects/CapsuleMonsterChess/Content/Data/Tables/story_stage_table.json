@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "tableVersion": "bootstrap.1",
+  "source": {
+    "kind": "bootstrap",
+    "authoritative": false,
+    "note": "Unity project has no stage master table; replace before gameplay balancing."
+  },
+  "chapterName": "DRAGON TRAIL",
+  "stages": [
+    { "stageId": 1, "chapterId": 1, "stageNumber": 1, "name": "Capsule Awakening", "enemyPower": 350, "energyCost": 1, "rewardGold": 80 },
+    { "stageId": 2, "chapterId": 1, "stageNumber": 2, "name": "Mushroom Path", "enemyPower": 470, "energyCost": 1, "rewardGold": 100 },
+    { "stageId": 3, "chapterId": 1, "stageNumber": 3, "name": "Bat Hollow", "enemyPower": 620, "energyCost": 1, "rewardGold": 120 },
+    { "stageId": 4, "chapterId": 1, "stageNumber": 4, "name": "Spider Den", "enemyPower": 790, "energyCost": 2, "rewardGold": 140 },
+    { "stageId": 5, "chapterId": 1, "stageNumber": 5, "name": "Bee Meadow", "enemyPower": 980, "energyCost": 2, "rewardGold": 160 },
+    { "stageId": 6, "chapterId": 1, "stageNumber": 6, "name": "Phantom Gate", "enemyPower": 1200, "energyCost": 2, "rewardGold": 220 },
+    { "stageId": 7, "chapterId": 1, "stageNumber": 7, "name": "Cactus Ridge", "enemyPower": 1450, "energyCost": 2, "rewardGold": 240 },
+    { "stageId": 8, "chapterId": 1, "stageNumber": 8, "name": "Snake Crossing", "enemyPower": 1730, "energyCost": 2, "rewardGold": 260 },
+    { "stageId": 9, "chapterId": 1, "stageNumber": 9, "name": "Wolf Run", "enemyPower": 2040, "energyCost": 3, "rewardGold": 280 },
+    { "stageId": 10, "chapterId": 1, "stageNumber": 10, "name": "Bomb Workshop", "enemyPower": 2380, "energyCost": 3, "rewardGold": 300 },
+    { "stageId": 11, "chapterId": 1, "stageNumber": 11, "name": "Golem Quarry", "enemyPower": 2750, "energyCost": 3, "rewardGold": 320 },
+    { "stageId": 12, "chapterId": 1, "stageNumber": 12, "name": "Dragon Roost", "enemyPower": 3150, "energyCost": 3, "rewardGold": 420 },
+    { "stageId": 13, "chapterId": 1, "stageNumber": 13, "name": "Snow Pass", "enemyPower": 3580, "energyCost": 3, "rewardGold": 440 },
+    { "stageId": 14, "chapterId": 1, "stageNumber": 14, "name": "Lantern Marsh", "enemyPower": 4040, "energyCost": 3, "rewardGold": 460 },
+    { "stageId": 15, "chapterId": 1, "stageNumber": 15, "name": "Ogre Bridge", "enemyPower": 4530, "energyCost": 4, "rewardGold": 480 },
+    { "stageId": 16, "chapterId": 1, "stageNumber": 16, "name": "Demon Keep", "enemyPower": 5050, "energyCost": 4, "rewardGold": 500 },
+    { "stageId": 17, "chapterId": 1, "stageNumber": 17, "name": "Angel Ruins", "enemyPower": 5600, "energyCost": 4, "rewardGold": 520 },
+    { "stageId": 18, "chapterId": 1, "stageNumber": 18, "name": "Goblin Court", "enemyPower": 6180, "energyCost": 4, "rewardGold": 640 },
+    { "stageId": 19, "chapterId": 1, "stageNumber": 19, "name": "Ancient Tree", "enemyPower": 6790, "energyCost": 4, "rewardGold": 660 },
+    { "stageId": 20, "chapterId": 1, "stageNumber": 20, "name": "Robot Foundry", "enemyPower": 7430, "energyCost": 4, "rewardGold": 680 },
+    { "stageId": 21, "chapterId": 1, "stageNumber": 21, "name": "Thunder Peak", "enemyPower": 8100, "energyCost": 5, "rewardGold": 700 },
+    { "stageId": 22, "chapterId": 1, "stageNumber": 22, "name": "Inferno Steps", "enemyPower": 8800, "energyCost": 5, "rewardGold": 720 },
+    { "stageId": 23, "chapterId": 1, "stageNumber": 23, "name": "Royal Approach", "enemyPower": 9530, "energyCost": 5, "rewardGold": 740 },
+    { "stageId": 24, "chapterId": 1, "stageNumber": 24, "name": "Training Finale", "enemyPower": 10290, "energyCost": 5, "rewardGold": 900 }
+  ]
+}

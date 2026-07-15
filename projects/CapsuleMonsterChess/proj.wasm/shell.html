@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Capsule Monster Chess</title>
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #0f1022;
+      }
+
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #game {
+        position: relative;
+        width: min(100vw, 56.25vh);
+        height: min(100vh, 177.777778vw);
+        width: min(100vw, 56.25dvh);
+        height: min(100dvh, 177.777778vw);
+        overflow: hidden;
+        background: #000;
+      }
+
+      #canvas {
+        display: block;
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: #000;
+        touch-action: none;
+      }
+
+      #loading {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        display: grid;
+        place-content: center;
+        gap: 12px;
+        color: #fff6dd;
+        background: #0f1022;
+        font: 600 16px system-ui, sans-serif;
+        text-align: center;
+        pointer-events: none;
+      }
+
+      #loading[hidden] {
+        display: none;
+      }
+
+      #progress {
+        width: min(240px, 70vw);
+      }
+    </style>
+  </head>
+  <body>
+    <main id="game">
+      <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+      <div id="loading">
+        <div id="status">Downloading...</div>
+        <progress id="progress" value="0" max="100" hidden></progress>
+      </div>
+    </main>
+
+    <script>
+      var statusElement = document.getElementById('status');
+      var progressElement = document.getElementById('progress');
+      var loadingElement = document.getElementById('loading');
+
+      var Module = {
+        preInit: [],
+        preRun: [],
+        postRun: [],
+        print: function() {
+          var text = Array.prototype.slice.call(arguments).join(' ');
+          console.log(text);
+        },
+        printErr: function() {
+          var text = Array.prototype.slice.call(arguments).join(' ');
+          console.error(text);
+        },
+        canvas: (function() {
+          var canvas = document.getElementById('canvas');
+          window.axmolContextRecovery = { lost: 0, restored: 0 };
+
+          function lockCanvasDisplaySize() {
+            if (canvas.style.getPropertyValue('width') !== '100%' ||
+                canvas.style.getPropertyPriority('width') !== 'important') {
+              canvas.style.setProperty('width', '100%', 'important');
+            }
+            if (canvas.style.getPropertyValue('height') !== '100%' ||
+                canvas.style.getPropertyPriority('height') !== 'important') {
+              canvas.style.setProperty('height', '100%', 'important');
+            }
+          }
+
+          new MutationObserver(lockCanvasDisplaySize).observe(canvas, {
+            attributes: true,
+            attributeFilter: ['style']
+          });
+          window.addEventListener('resize', lockCanvasDisplaySize);
+          lockCanvasDisplaySize();
+
+          function updateContextRecoveryState() {
+            var state = window.axmolContextRecovery;
+            canvas.dataset.axmolContextLost = String(state.lost);
+            canvas.dataset.axmolContextRestored = String(state.restored);
+            document.documentElement.dataset.axmolContextLost = String(state.lost);
+            document.documentElement.dataset.axmolContextRestored = String(state.restored);
+          }
+
+          updateContextRecoveryState();
+          canvas.addEventListener('webglcontextlost', function(event) {
+            event.preventDefault();
+            window.axmolContextRecovery.lost++;
+            updateContextRecoveryState();
+            Module.setStatus('WebGL context lost; rebuilding...');
+            Module.ccall('axmol_webglcontextlost', null, [], []);
+          }, false);
+          canvas.addEventListener('webglcontextrestored', function(event) {
+            event.preventDefault();
+            Module.ccall('axmol_webglcontextrestored', null, [], []);
+            window.axmolContextRecovery.restored++;
+            updateContextRecoveryState();
+            Module.setStatus('');
+          }, false);
+          document.addEventListener('visibilitychange', function() {
+            Module.ccall('axmol_hdoc_visibilitychange', null, ['number'], [document.hidden ? 1 : 0]);
+          });
+          return canvas;
+        })(),
+        setStatus: function(text) {
+          if (!text) {
+            loadingElement.hidden = true;
+            return;
+          }
+
+          loadingElement.hidden = false;
+          var match = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+          if (match) {
+            statusElement.textContent = match[1].trim();
+            progressElement.value = Number(match[2]);
+            progressElement.max = Number(match[4]);
+            progressElement.hidden = false;
+          } else {
+            statusElement.textContent = text;
+            progressElement.hidden = true;
+          }
+        },
+        totalDependencies: 0,
+        monitorRunDependencies: function(left) {
+          this.totalDependencies = Math.max(this.totalDependencies, left);
+          Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies - left) + '/' +
+            this.totalDependencies + ')' : '');
+        }
+      };
+
+      Module.setStatus('Downloading...');
+      var reportingWindowError = false;
+      window.onerror = function(message, source, line, column, error) {
+        if (reportingWindowError) return false;
+        reportingWindowError = true;
+        var detail = '[window.onerror] ' + String(message) + ' @ ' +
+          (source || '<unknown>') + ':' + (line || 0) + ':' + (column || 0);
+        Module.printErr(detail);
+        if (error && error.stack) Module.printErr(error.stack);
+        Module.setStatus('Exception thrown; see the browser console');
+        reportingWindowError = false;
+        return false;
+      };
+    </script>
+#if PTHREADS
+    <script>
+      (function() {
+        var threadsReady = window.crossOriginIsolated === true &&
+          typeof SharedArrayBuffer !== 'undefined';
+        document.documentElement.dataset.axmolCrossOriginIsolated = threadsReady ? '1' : '0';
+        if (threadsReady) return;
+
+        var message = 'This build requires COOP/COEP headers for WebAssembly threads.';
+        window.axmolPthreadPreflightFailed = true;
+        Module.setStatus(message);
+        Module.printErr(message);
+        window.stop();
+      })();
+    </script>
+#endif
+    {{{ SCRIPT }}}
+  </body>
+</html>

@@ -29,8 +29,10 @@ THE SOFTWARE.
 
 #include "axmol/base/Scheduler.h"
 #include "axmol/base/Macros.h"
-#include "axmol/base/Director.h"
-#include "axmol/base/ScriptSupport.h"
+
+#if AX_ENABLE_SCRIPT_BINDING
+#    include "axmol/base/ScriptSupport.h"
+#endif
 
 namespace ax
 {

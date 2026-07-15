@@ -1,61 +1,23 @@
 #include "MainScene.h"
 
+#include "Client/Battle/BattleScene.h"
+#include "Client/Lobby/LobbyLayer.h"
+#include "Client/Rendering/DragonFixtureRenderer.h"
+
 #include "axmol/2d/Light.h"
-#include "axmol/3d/Animate3D.h"
-#include "axmol/3d/Animation3D.h"
 #include "axmol/3d/Mesh.h"
 #include "axmol/3d/MeshRenderer.h"
 #include "axmol/3d/StylizedMaterial.h"
 #include "axmol/3d/StylizedRenderer.h"
 #include "axmol/scene/CameraBackgroundBrush.h"
-#include "axmol/renderer/Texture2D.h"
 
-#include <algorithm>
-#include <array>
+#include <string>
 
 namespace
 {
 using namespace ax;
 
 constexpr unsigned short WORLD_CAMERA_MASK = static_cast<unsigned short>(CameraFlag::USER1);
-constexpr std::string_view DRAGON_ASSET    = "Local/DragonFireFlyIdle.glb";
-
-Texture2D* createDragonToonRamp()
-{
-    constexpr size_t TEXEL_COUNT = 32;
-    std::array<uint8_t, TEXEL_COUNT * 4> pixels{};
-    const auto smoothStep = [](float minimum, float maximum, float value) {
-        const float t = std::clamp((value - minimum) / (maximum - minimum), 0.0F, 1.0F);
-        return t * t * (3.0F - 2.0F * t);
-    };
-
-    for (size_t index = 0; index < TEXEL_COUNT; ++index)
-    {
-        const float x           = static_cast<float>(index) / static_cast<float>(TEXEL_COUNT - 1);
-        const float shadowToMid = smoothStep(0.42F, 0.54F, x);
-        const float midToLight  = smoothStep(0.64F, 0.74F, x);
-        const float shadowBand  = 0.18F;
-        const float middleBand  = 0.55F;
-        float value             = shadowBand + (middleBand - shadowBand) * shadowToMid;
-        value += (1.0F - value) * midToLight;
-        const auto channel    = static_cast<uint8_t>(std::clamp(value * 255.0F + 0.5F, 0.0F, 255.0F));
-        pixels[index * 4]     = channel;
-        pixels[index * 4 + 1] = channel;
-        pixels[index * 4 + 2] = channel;
-        pixels[index * 4 + 3] = 255;
-    }
-
-    auto* texture = new Texture2D();
-    if (!texture->initWithData(pixels.data(), static_cast<ssize_t>(pixels.size()), rhi::PixelFormat::RGBA8,
-                               static_cast<int>(TEXEL_COUNT), 1))
-    {
-        delete texture;
-        return nullptr;
-    }
-    texture->setTexParameters(Texture2D::TexParams{});
-    texture->autorelease();
-    return texture;
-}
 
 MeshRenderer* createGround(StylizedMaterial* material)
 {
@@ -87,76 +49,21 @@ void showStatus(Scene& scene, std::string_view text, const Color32& color)
     scene.addChild(label);
 }
 
-bool addDragon(Scene& scene)
+MeshRenderer* addDragon(Scene& scene)
 {
-    auto* dragon   = MeshRenderer::create(DRAGON_ASSET);
-    auto* skeleton = dragon ? dragon->getSkeleton() : nullptr;
-    auto* material =
-        dragon && dragon->getMeshCount() > 0 ? dynamic_cast<StylizedMaterial*>(dragon->getMaterial(0)) : nullptr;
-    auto* animation = dragon ? Animation3D::create(DRAGON_ASSET) : nullptr;
-
-    if (!dragon || !skeleton || !material || !material->isSkinned() || !animation || animation->getDuration() <= 0.0F)
+    cmc::client::DragonFixtureStyle style;
+    std::string error;
+    auto* dragon = cmc::client::createDragonFixture(style, error);
+    if (!dragon)
     {
-        AXLOGE("Dragon validation failed: asset={}, renderer={}, skeleton={}, material={}, animation={}", DRAGON_ASSET,
-               dragon != nullptr, skeleton != nullptr, material != nullptr, animation != nullptr);
+        AXLOGE("Dragon validation failed: {}", error);
         showStatus(scene, "Dragon asset load failed: Content/Local/DragonFireFlyIdle.glb", Color32{255, 96, 96, 255});
-        return false;
+        return nullptr;
     }
-
-    auto desc                = material->getDescription();
-    desc.highlightColor      = Color::white;
-    desc.shadowColor         = Color{0.25F, 0.25F, 0.25F, 1.0F};
-    desc.diffuseTint         = Color{1.0F, 0.9290111F, 0.75F, 1.0F};
-    desc.toonRampTexture     = createDragonToonRamp();
-    desc.bandThreshold       = 0.68F;
-    desc.bandSoftness        = 0.25F;
-    desc.rampTextureStrength = desc.toonRampTexture ? 0.82F : 0.0F;
-    desc.minimumBrightness   = 0.092F;
-    desc.unlitStrength       = 0.5F;
-    desc.subsurfaceColor     = Color{1.0F, 0.45F, 0.38F, 1.0F};
-    desc.subsurfaceStrength  = 0.328F;
-    desc.subsurfaceFalloff   = 2.31F;
-    desc.rimColor            = Color{1.0F, 0.9F, 0.8F, 1.0F};
-    desc.rimStart            = 0.0F;
-    desc.rimEnd              = 0.82F;
-    desc.rimPower            = 2.2F;
-    desc.rimLightThreshold   = 0.04F;
-    desc.rimLightSoftness    = 0.14F;
-    desc.rimIntensity        = 0.75F;
-    if (!material->setDescription(desc))
-    {
-        AXLOGE("Dragon stylized material setup failed");
-        showStatus(scene, "Dragon stylized material setup failed", Color32{255, 96, 96, 255});
-        return false;
-    }
-
-    const AABB bounds     = dragon->getAABBRecursively();
-    const AABB bindBounds = dragon->getMesh()->getAABB();
-    const Vec3 bindSize   = bindBounds._max - bindBounds._min;
-    const float extent    = std::max({bindSize.x, bindSize.y, bindSize.z});
-    if (bounds.isEmpty() || bindBounds.isEmpty() || extent <= 1.0e-4F)
-    {
-        AXLOGE("Dragon bounds are invalid");
-        showStatus(scene, "Dragon bounds are invalid", Color32{255, 96, 96, 255});
-        return false;
-    }
-
-    constexpr float targetExtent = 4.15F;
-    const float scale            = targetExtent / extent;
-    const Vec3 center            = (bounds._min + bounds._max) * 0.5F;
-    dragon->setScale(scale);
-    dragon->setPosition3D({-center.x * scale, 0.03F - bounds._min.y * scale, -center.z * scale});
-    dragon->setRotation3D({0.0F, -18.0F, 0.0F});
-    dragon->setCameraMask(WORLD_CAMERA_MASK);
-    dragon->setCastShadow(true);
-    dragon->setReceiveShadow(true);
-    dragon->runAction(RepeatForever::create(Animate3D::create(animation)));
     scene.addChild(dragon);
 
-    AXLOGI("Dragon ready: meshes={}, joints={}, animation={}s", dragon->getMeshCount(), skeleton->getBoneCount(),
-           animation->getDuration());
-    showStatus(scene, "Capsule Monster Chess | JMO Ramp LUT | AC Wide Directional Rim", Color32{245, 242, 255, 255});
-    return true;
+    AXLOGI("Dragon ready: meshes={}, joints={}", dragon->getMeshCount(), dragon->getSkeleton()->getBoneCount());
+    return dragon;
 }
 }  // namespace
 
@@ -201,6 +108,30 @@ bool MainScene::init()
     groundDesc.rimIntensity = 0.0F;
     addChild(createGround(StylizedMaterial::create(groundDesc)));
 
-    addDragon(*this);
+    auto* dragon = addDragon(*this);
+    auto* lobby  = cmc::client::LobbyLayer::create();
+    lobby->setWorldVisibilityCallback([worldCamera, dragon](bool visible) {
+        worldCamera->setVisible(visible);
+        if (!dragon)
+            return;
+
+        dragon->setVisible(visible);
+        if (visible)
+            dragon->resume();
+        else
+            dragon->pause();
+    });
+    lobby->setBattleLaunchCallback([](const cmc::client::BattlePresentationRequest& request) {
+        Director::getInstance()->postTask([request] {
+            auto* battleScene = cmc::client::BattleScene::create(request);
+            if (!battleScene)
+            {
+                AXLOGE("Battle scene creation failed: stage={}", request.stageId);
+                return;
+            }
+            Director::getInstance()->replaceScene(battleScene);
+        }, Director::TaskTiming::FrameBoundary);
+    });
+    addChild(lobby);
     return true;
 }

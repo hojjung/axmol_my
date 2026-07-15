@@ -147,7 +147,9 @@ THE SOFTWARE.
 #define AX_HAS_USER_RHI (AX_ENABLE_GL || AX_ENABLE_VK || AX_ENABLE_D3D11 || AX_ENABLE_D3D12 || AX_ENABLE_MTL)
 
 // Platform defaults + forced disable
-#if AX_TARGET_PLATFORM == AX_PLATFORM_WIN32 || AX_TARGET_PLATFORM == AX_PLATFORM_WINRT
+#if defined(AX_HEADLESS_SERVER) && AX_HEADLESS_SERVER
+// A headless process intentionally has no rendering backend.
+#elif AX_TARGET_PLATFORM == AX_PLATFORM_WIN32 || AX_TARGET_PLATFORM == AX_PLATFORM_WINRT
 // Force disable unsupported
 #    undef AX_ENABLE_MTL
 #    define AX_ENABLE_MTL 0

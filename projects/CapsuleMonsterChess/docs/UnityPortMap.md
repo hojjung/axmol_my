@@ -14,7 +14,7 @@
 
 ## 테이블 현황
 
-CMS 전용 런타임 JSON은 현재 저장소에 없다.
+Unity 저장소에는 CMS 전용 런타임 JSON이 없다.
 
 ```text
 Google Sheet CSV
@@ -30,14 +30,37 @@ Google Sheet CSV
 - `CMS_Unity/Assets/Scripts/Tables/MonsterUnitTableAsset.cs`
 - `CMS_Unity/Assets/Scripts/Editor/MonsterUnitTableAssetEditor.cs`
 
+Axmol 프로젝트에는 이 경로를 우회해 라이브 Sheet와 Unity 썸네일을 직접 가져오는
+`Tools/import_unity_content.py`를 추가했다.
+
+```sh
+cd /Users/ethanjung/Desktop/Dev/Cpp/axmol_my/projects/CapsuleMonsterChess
+python3 Tools/import_unity_content.py --unity-root "$UNITY_ROOT"
+```
+
+결과는 `Content/Data/Tables/monster_unit_table.json`과 `Content/UI/MonsterIcons`에 생성된다.
+아이콘 PNG는 Unity 라이선스 파생 자산이므로 로컬 전용이며 Git 추적 대상이 아니다.
+
 라이브 Sheet는 유효 유닛 168개다. 역할별로 Pawn 42, Knight/Bishop/Rook 각 28, Queen 24,
 King 18이며 스킬 1~3은 비어 있다. `Resources/MonsterUnitTable.asset`은 2026-07-04 스냅샷으로
 현재 Sheet와 RNG 70개가 다르고, `Resources/Tables/MonsterUnitTable.asset`은 빈 중복 에셋이다.
 현재 Export는 `Characters`만 기록해 version/hash/source가 없다.
 
-따라서 `.asset`을 복사하지 않는다. Sheet를 검증하고 `schemaVersion`, `tableVersion`,
-`sourceRevision`, `contentHash`, `units`를 포함한 단일 JSON으로 내보낸다. 이 파일 하나를 클라이언트와
-서버 패키지에 함께 넣는다.
+현재 임포터는 `.asset`을 복사하지 않고 168개 유닛을 `NameKey` 논리 키 기준으로
+가져온다. Unity `UnitThumbnails`의 파일명과 정규화한 `NameKey`가 유일하게 일치하는 39개
+아이콘만 직접 복사·리사이즈한다. 나머지 129개는 로비에서 속성색과 `NameKey`
+모노그램 placeholder로 표시한다. `NameKey`는 파일명이 아니므로 현재 정규화 일치는
+임시 규칙이며, 나머지 아이콘은 향후 `NameKey` → 자산 경로를 명시한 매핑으로 해결한다.
+
+현재 로비용 JSON은 `schemaVersion`, 원본 URL/hash, 경고, 아이콘 바인딩 결과와
+`characters`를 기록한다. 서버 권위 전투 배포 전에 `tableVersion`, `sourceRevision`,
+`contentHash`를 포함한 canonical 스냅샷으로 고정하고 같은 파일을 클라이언트와 서버에 넣는다.
+
+Unity 저장소와 연결된 Sheet 및 전체 Git 이력에는 스토리 스테이지 마스터가 없다.
+`WidgetMain_Stage.prefab`의 `Stage 3123`, `1/5`는 정적 표시 샘플이며 Battle 버튼에도 런타임
+콜백이 없다. 따라서 Axmol의 `story_stage_table.json` 24개 항목은 선택 화면 검증용 bootstrap이며
+`source.authoritative: false`다. 실제 밸런스 테이블이 확보되면 동일 스키마의 배포 스냅샷으로
+교체한다. 잠금과 클리어 상태는 테이블이 아니라 사용자 진행 데이터에서 계산한다.
 
 ## 모델 현황
 

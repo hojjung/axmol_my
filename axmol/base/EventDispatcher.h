@@ -27,19 +27,22 @@
 #pragma once
 
 #include <functional>
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
+#    include <set>
+#endif
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <set>
 
 #include "axmol/platform/PlatformMacros.h"
 #include "axmol/base/EventListener.h"
 #include "axmol/base/Event.h"
-#include "axmol/base/PointerEvent.h"
-#include "axmol/base/WeakPtr.h"
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
+#    include "axmol/base/PointerEvent.h"
+#    include "axmol/base/WeakPtr.h"
+#endif
 #include "axmol/platform/StdC.h"
 #include "axmol/tlx/hlookup.hpp"
-#include "axmol/tlx/inlined_vector.hpp"
 
 /**
  * @addtogroup base
@@ -50,12 +53,14 @@ namespace ax
 {
 
 class Event;
-class PointerEvent;
-class Node;
 class CustomEvent;
 class CustomEventListener;
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
+class PointerEvent;
+class Node;
 class PointerEventListener;
 class Camera;
+#endif
 
 /** @class EventDispatcher
 * @brief This class manages event listener subscriptions
@@ -71,6 +76,7 @@ class AX_DLL EventDispatcher : public Object
 public:
     // Adds event listener.
 
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
     /** Adds a event listener for a specified event with the priority of scene graph.
      *  @param listener The listener of a specified event.
      *  @param node The priority of the listener is based on the draw order of this node.
@@ -78,6 +84,7 @@ public:
      *          in the vector will be ' <0, scene graph (0 priority), >0'.
      */
     void addEventListenerWithSceneGraphPriority(EventListener* listener, Node* node);
+#endif
 
     /** Adds a event listener for a specified event with the fixed priority.
      *  @param listener The listener of a specified event.
@@ -113,12 +120,14 @@ public:
      */
     void removeEventListenersForType(EventListener::Type listenerType);
 
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
     /** Removes all listeners which are associated with the specified target.
      *
      * @param target A given target node.
      * @param recursive True if remove recursively, the default value is false.
      */
     void removeEventListenersForTarget(Node* target, bool recursive = false);
+#endif
 
     /** Removes all custom listeners with the same event name.
      *
@@ -134,6 +143,7 @@ public:
 
     // Pauses / Resumes event listener
 
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
     /** Pauses all listeners which are associated the specified target.
      *
      * @param target A given target node.
@@ -147,6 +157,7 @@ public:
      * @param recursive True if resume recursively, the default value is false.
      */
     void resumeEventListenersForTarget(Node* target, bool recursive = false);
+#endif
 
     /////////////////////////////////////////////
 
@@ -205,7 +216,7 @@ public:
      */
     ~EventDispatcher();
 
-#if AX_NODE_DEBUG_VERIFY_EVENT_LISTENERS && _AX_DEBUG > 0
+#if (!defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER) && AX_NODE_DEBUG_VERIFY_EVENT_LISTENERS && _AX_DEBUG > 0
 
     /**
      * To help track down event listener issues in debug builds.
@@ -216,10 +227,12 @@ public:
 #endif
 
 protected:
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
     friend class Node;
 
     /** Sets the dirty flag for a node. */
     void setDirtyForNode(Node* node);
+#endif
 
     /**
      *  The vector to store event listeners with scene graph based priority and fixed priority.
@@ -233,19 +246,25 @@ protected:
         bool empty() const;
 
         void emplace_back(EventListener* item);
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
         void clearSceneGraphListeners();
+#endif
         void clearFixedListeners();
         void clear();
 
         std::vector<EventListener*>* getFixedPriorityListeners() const { return _fixedListeners; }
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
         std::vector<EventListener*>* getSceneGraphPriorityListeners() const { return _sceneGraphListeners; }
         ssize_t getGt0Index() const { return _gt0Index; }
         void setGt0Index(ssize_t index) { _gt0Index = index; }
+#endif
 
     private:
         std::vector<EventListener*>* _fixedListeners;
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
         std::vector<EventListener*>* _sceneGraphListeners;
         ssize_t _gt0Index;
+#endif
     };
 
     /** Adds an event listener with item
@@ -263,8 +282,10 @@ protected:
     /** Gets event the listener list for the event listener type. */
     EventListenerVector* getListeners(std::string_view listenerID) const;
 
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
     /** Update dirty flag */
     void updateDirtyFlagForSceneGraph();
+#endif
 
     /** Removes all listeners with the same event listener ID */
     void removeEventListenersForListenerID(std::string_view listenerID);
@@ -272,8 +293,10 @@ protected:
     /** Sort event listener */
     void sortEventListeners(std::string_view listenerID);
 
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
     /** Sorts the listeners of specified type by scene graph priority */
     void sortEventListenersOfSceneGraphPriority(std::string_view listenerID, Node* rootNode);
+#endif
 
     /** Sorts the listeners of specified type by fixed priority */
     void sortEventListenersOfFixedPriority(std::string_view listenerID);
@@ -284,45 +307,58 @@ protected:
      */
     void updateListeners(Event* event);
 
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
     void dispatchPointerEvent(PointerEvent* event);
+#endif
 
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
     /** Associates node with event listener */
     void associateNodeAndEventListener(Node* node, EventListener* listener);
 
     /** Dissociates node with event listener */
     void dissociateNodeAndEventListener(Node* node, EventListener* listener);
+#endif
 
     /** Dispatches event to listeners with a specified listener type */
     void dispatchEventToListeners(EventListenerVector* listeners, const std::function<bool(EventListener*)>& onEvent);
 
+    void releaseListener(EventListener* listener);
+
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
     void removeCapturedPointerListener(EventListener* listener);
     void removeCapturedPointerListenersForTarget(Node* target);
-
-    void releaseListener(EventListener* listener);
 
     static const Camera* findHitCameraForListener(PointerEvent* event,
                                                   PointerEventListener* listener,
                                                   const std::vector<Camera*>& cameras);
+#endif
 
     /// Priority dirty flag
     enum class DirtyFlag
     {
-        NONE                 = 0,
-        FIXED_PRIORITY       = 1 << 0,
+        NONE           = 0,
+        FIXED_PRIORITY = 1 << 0,
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
         SCENE_GRAPH_PRIORITY = 1 << 1,
         ALL                  = FIXED_PRIORITY | SCENE_GRAPH_PRIORITY
+#else
+        ALL = FIXED_PRIORITY
+#endif
     };
 
     /** Sets the dirty flag for a specified listener ID */
     void setDirty(std::string_view listenerID, DirtyFlag flag);
 
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
     /** Walks though scene graph to get the draw order for each node, it's called before sorting event listener with
      * scene graph priority */
     void visitTarget(Node* node, bool isRootNode);
+#endif
 
     /** Remove all listeners in _toRemoveListeners list and cleanup */
     void cleanToRemovedListeners();
 
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
     using PointerCaptureId = uint64_t;
     struct PointerCaptureEntry
     {
@@ -333,6 +369,7 @@ protected:
 
     bool dispatchCapturedPointerEvent(PointerEvent* event);
     void dispatchUncapturedPointerEvent(PointerEvent* event, PointerCaptureId captureId);
+#endif
 
     /** Listeners map */
     tlx::string_map<EventListenerVector*> _listenerMap;
@@ -340,6 +377,7 @@ protected:
     /** The map of dirty flag */
     tlx::string_map<DirtyFlag> _priorityDirtyFlagMap;
 
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
     /** The map of node and event listeners */
     tlx::hash_map<Node*, std::vector<EventListener*>*> _nodeListenersMap;
 
@@ -350,6 +388,7 @@ protected:
     tlx::hash_map<float, std::vector<Node*>> _globalZOrderNodeMap;
 
     tlx::hash_map<PointerCaptureId, PointerCaptureEntry> _capturedPointerListeners;
+#endif
 
     /** The listeners to be added after dispatching event */
     std::vector<EventListener*> _toAddedListeners;
@@ -357,8 +396,10 @@ protected:
     /** The listeners to be removed after dispatching event */
     std::vector<EventListener*> _toRemovedListeners;
 
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
     /** The nodes were associated with scene graph based priority listeners */
     std::set<Node*> _dirtyNodes;
+#endif
 
     /** Whether the dispatcher is dispatching event */
     int _inDispatch;
@@ -366,9 +407,10 @@ protected:
     /** Whether to enable dispatching event */
     bool _isEnabled;
 
+#if !defined(AX_HEADLESS_SERVER) || !AX_HEADLESS_SERVER
     int _nodePriorityIndex;
-
     std::set<std::string> _internalCustomListenerIDs;
+#endif
 };
 
 }  // namespace ax

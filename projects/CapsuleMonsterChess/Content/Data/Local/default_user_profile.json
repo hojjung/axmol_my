@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 2,
+  "currencies": {
+    "gold": 1000,
+    "gems": 100,
+    "energy": 50
+  },
+  "ownedUnits": [
+    {
+      "unitId": 4,
+      "level": 3,
+      "shards": 8,
+      "equipmentItemIds": [101, 102, 0, 0, 0, 0]
+    },
+    {
+      "unitId": 7,
+      "level": 2,
+      "shards": 3,
+      "equipmentItemIds": [0, 0, 0, 0, 0, 0]
+    },
+    {
+      "unitId": 10,
+      "level": 2,
+      "shards": 1,
+      "equipmentItemIds": [0, 0, 0, 0, 0, 0]
+    },
+    {
+      "unitId": 16,
+      "level": 1,
+      "shards": 0,
+      "equipmentItemIds": [0, 0, 0, 0, 0, 0]
+    },
+    {
+      "unitId": 22,
+      "level": 1,
+      "shards": 0,
+      "equipmentItemIds": [0, 0, 0, 0, 0, 0]
+    },
+    {
+      "unitId": 28,
+      "level": 1,
+      "shards": 0,
+      "equipmentItemIds": [0, 0, 0, 0, 0, 0]
+    },
+    {
+      "unitId": 31,
+      "level": 1,
+      "shards": 0,
+      "equipmentItemIds": [0, 0, 0, 0, 0, 0]
+    },
+    {
+      "unitId": 40,
+      "level": 1,
+      "shards": 0,
+      "equipmentItemIds": [0, 0, 0, 0, 0, 0]
+    }
+  ],
+  "deckPresets": [
+    {
+      "unitIds": [4, 7, 10, 16, 31]
+    },
+    {
+      "unitIds": [16, 22, 28, 31, 40]
+    },
+    {
+      "unitIds": [4, 10, 22, 31, 0]
+    },
+    {
+      "unitIds": [7, 16, 28, 40, 0]
+    },
+    {
+      "unitIds": [4, 16, 31, 0, 0]
+    }
+  ],
+  "questProgress": [
+    { "questId": 101, "progress": 1, "rewardClaimed": false },
+    { "questId": 102, "progress": 5, "rewardClaimed": false },
+    { "questId": 103, "progress": 0, "rewardClaimed": false },
+    { "questId": 201, "progress": 5, "rewardClaimed": false },
+    { "questId": 202, "progress": 8, "rewardClaimed": false },
+    { "questId": 203, "progress": 2, "rewardClaimed": false },
+    { "questId": 301, "progress": 20, "rewardClaimed": false },
+    { "questId": 302, "progress": 0, "rewardClaimed": false },
+    { "questId": 303, "progress": 1, "rewardClaimed": false }
+  ],
+  "battlePass": {
+    "seasonId": 1,
+    "points": 20,
+    "premiumUnlocked": false,
+    "claimedFreeTierIds": [],
+    "claimedPremiumTierIds": []
+  },
+  "selectedPresetIndex": 0
+}
