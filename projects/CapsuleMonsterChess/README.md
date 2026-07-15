@@ -19,7 +19,10 @@ JMO ramp/diffuse tint와 AC directional rim/SSS 특성을 런타임 파라미터
 HTTP 계약은 [Server](Server/README.md), 클라이언트·서버 모듈 경계와 삭제 목록은
 [Axmol Runtime Module Profile](docs/AxmolModuleProfile.md)에 있다. Axmol UI, Director, 게임 로직과
 Unity·Unreal 대응 관계를 포함한 수동 구현 기준은
-[수동 코딩 인수인계](../../docs/CapsuleMonsterChessManualCodingHandoff.md)를 따른다.
+[수동 코딩 인수인계](../../docs/CapsuleMonsterChessManualCodingHandoff.md)를 따른다. Unity 원본
+프리팹·씬·C# UI 프레임워크와 Anchor, Stretch, Layout, 이벤트, 애니메이션, Gradient, Vectrosity,
+번역을 항목별로 옮기는 방법은
+[Unity UI → Axmol 구현 가이드](../../docs/CapsuleMonsterChessUnityUiPortingGuide.md)에 정리되어 있다.
 
 ## Axmol 모듈 경계
 

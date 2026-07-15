@@ -3,6 +3,10 @@
 이 문서는 Axmol로 UI와 게임 로직을 직접 작성할 때 필요한 API, 현재 Capsule Monster Chess 구조,
 Unity·Unreal Engine과의 개념 대응, 안전한 확장 위치를 한곳에 정리한 실무용 인수인계다.
 
+Unity 원본의 `Resources/Prefabs/UI`, 씬, `UI_Manager`/`UI_Base` C# 프레임워크를 실제로 대조한
+Anchor·Stretch·Layout·이벤트·애니메이션·효과·현지화 상세 구현은
+[Unity UI → Axmol 구현 가이드](CapsuleMonsterChessUnityUiPortingGuide.md)를 따른다.
+
 ## 1. 기준과 핵심 결론
 
 - 조사 기준일: 2026-07-15
