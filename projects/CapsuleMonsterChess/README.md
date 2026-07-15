@@ -17,7 +17,9 @@ JMO ramp/diffuse tint와 AC directional rim/SSS 특성을 런타임 파라미터
 기획과 구현 순서는 [GameDesign](docs/GameDesign.md), [Architecture](docs/Architecture.md),
 [Milestone 01](docs/Milestone01.md), [Unity Port Map](docs/UnityPortMap.md)을 기준으로 한다. 헤드리스 빌드와
 HTTP 계약은 [Server](Server/README.md), 클라이언트·서버 모듈 경계와 삭제 목록은
-[Axmol Runtime Module Profile](docs/AxmolModuleProfile.md)에 있다.
+[Axmol Runtime Module Profile](docs/AxmolModuleProfile.md)에 있다. Axmol UI, Director, 게임 로직과
+Unity·Unreal 대응 관계를 포함한 수동 구현 기준은
+[수동 코딩 인수인계](../../docs/CapsuleMonsterChessManualCodingHandoff.md)를 따른다.
 
 ## Axmol 모듈 경계
 
