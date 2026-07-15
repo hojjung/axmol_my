@@ -30,6 +30,7 @@ The RenderView for win32,linux,macos,wasm
 
 #include "axmol/platform/pc/RenderView-pc.h"
 
+#include <algorithm>
 #include <cmath>
 #include <unordered_map>
 
@@ -580,8 +581,11 @@ static void initWebInputBridge()
             // Transform viewport coordinates (clientX/Y) into precise, local Canvas pixel coordinates.
             // This safely normalizes any CSS resizing, high-DPI Retina scaling, or full-screen layout shifts.
             var rect = canvas.getBoundingClientRect();
-            var canvasX = (e.clientX - rect.left);
-            var canvasY = (e.clientY - rect.top);
+            var inputScale = Module['axmolInputScale'] || 1.0;
+            var canvasScaleX = rect.width > 0 ? canvas.width / (rect.width * inputScale) : 1.0;
+            var canvasScaleY = rect.height > 0 ? canvas.height / (rect.height * inputScale) : 1.0;
+            var canvasX = (e.clientX - rect.left) * canvasScaleX;
+            var canvasY = (e.clientY - rect.top) * canvasScaleY;
 
             // Handle pressure telemetry and deploy the architecture safety firewall:
             // Non-pressure devices or standard mice return 0.0f by default during execution.
@@ -668,22 +672,25 @@ static void initWebInputBridge()
 
             // Compute canvas-local coordinates
             var rect = canvas.getBoundingClientRect();
-            var canvasX = (e.clientX - rect.left);
-            var canvasY = (e.clientY - rect.top);
+            var inputScale = Module['axmolInputScale'] || 1.0;
+            var canvasScaleX = rect.width > 0 ? canvas.width / (rect.width * inputScale) : 1.0;
+            var canvasScaleY = rect.height > 0 ? canvas.height / (rect.height * inputScale) : 1.0;
+            var canvasX = (e.clientX - rect.left) * canvasScaleX;
+            var canvasY = (e.clientY - rect.top) * canvasScaleY;
 
-            // Normalize deltaMode to pixels:
-            // 0 = DOM_DELTA_PIXEL, 1 = DOM_DELTA_LINE, 2 = DOM_DELTA_PAGE
-            // Use reasonable fallbacks: line -> 16px, page -> viewport height.
-            var deltaX = e.deltaX;
-            var deltaY = e.deltaY;
-            if (e.deltaMode === 1) { // lines
-                var LINE_HEIGHT = 16; // conservative default line height in pixels
-                deltaX *= LINE_HEIGHT;
-                deltaY *= LINE_HEIGHT;
+            // Match Emscripten GLFW's wheel-step normalization. ScrollView applies
+            // its own design-unit factor after receiving these dimensionless steps.
+            var deltaScale = 1.0;
+            if (e.deltaMode === 0) { // pixels
+                deltaScale = 1.0 / 100.0;
+            } else if (e.deltaMode === 1) { // lines
+                deltaScale = 1.0 / 3.0;
             } else if (e.deltaMode === 2) { // pages
-                deltaX *= window.innerHeight;
-                deltaY *= window.innerHeight;
+                deltaScale = 80.0;
             }
+            var deltaX = e.deltaX * deltaScale;
+            var deltaY = e.deltaY * deltaScale;
+            deltaY = deltaY === 0 ? 0 : (deltaY > 0 ? Math.max(deltaY, 1) : Math.min(deltaY, -1));
 
             // Determine pointerId if available (some browsers include pointerId on wheel events)
             var pid = (typeof e.pointerId !== 'undefined') ? e.pointerId : 0;
@@ -1643,7 +1650,11 @@ void RenderView::updateRenderScale()
 
     // Update InputSystem with the computed input scale so it can apply the
     // appropriate scaling when dispatching input events.
-    InputSystem::getInstance()->setInputScale(inputScale);
+    const float effectiveInputScale = std::max(inputScale, 1.0f);
+    InputSystem::getInstance()->setInputScale(effectiveInputScale);
+#if defined(__EMSCRIPTEN__)
+    MAIN_THREAD_EM_ASM({ Module['axmolInputScale'] = $0; }, effectiveInputScale);
+#endif
 }
 
 void RenderView::onGLFWError(int errorID, const char* errorDesc)
