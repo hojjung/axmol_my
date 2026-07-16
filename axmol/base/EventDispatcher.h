@@ -31,6 +31,7 @@
 #    include <set>
 #endif
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "axmol/platform/PlatformMacros.h"

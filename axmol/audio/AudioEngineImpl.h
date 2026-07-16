@@ -25,8 +25,6 @@
  ****************************************************************************/
 #pragma once
 
-#include "axmol/base/HashMap.h"
-
 #include <queue>
 #include <memory>
 
@@ -115,7 +113,7 @@ private:
     tlx::string_map<std::unique_ptr<AudioCache>> _audioCaches;
 
     // audioID,AudioInfo
-    ax::HashMap<AudioId, AudioPlayer*> _audioPlayers;
+    std::unordered_map<AudioId, AudioPlayer*> _audioPlayers;
     std::recursive_mutex _threadMutex;
 
     // finish callbacks

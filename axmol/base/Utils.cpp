@@ -25,8 +25,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ****************************************************************************/
 
-#include "axmol/base/HashMap.h"
-
 #include "axmol/base/Utils.h"
 
 #include <cmath>
@@ -130,7 +128,7 @@ void captureScreen(std::function<void(RefPtr<Image>)> imageCallback)
     });
 }
 
-static ax::HashMap<Node*, CustomEventListener*> s_captureNodeListener;
+static std::unordered_map<Node*, CustomEventListener*> s_captureNodeListener;
 void captureNode(Node* startNode, std::function<void(RefPtr<Image>)> imageCallback, float scale)
 {
     if (s_captureNodeListener.find(startNode) != s_captureNodeListener.end())

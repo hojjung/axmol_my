@@ -33,7 +33,6 @@ THE SOFTWARE.
 #include <mutex>
 #include <set>
 #include "axmol/tlx/vector.hpp"
-#include "axmol/base/HashMap.h"
 #include "axmol/base/Object.h"
 #include "axmol/base/Vector.h"
 
@@ -481,7 +480,7 @@ protected:
 
     void activeWaitList();
 
-    void unscheduleAllForTarget(HashMap<void*, TimerHandle>::iterator& timerIt);
+    void unscheduleAllForTarget(std::unordered_map<void*, TimerHandle>::iterator& timerIt);
 
     float _timeScale;
 
@@ -494,15 +493,14 @@ protected:
     tlx::pod_vector<SchedHandle*> _updates0List;    // list priority == 0
     tlx::pod_vector<SchedHandle*> _updatesPosList;  // list priority > 0
     // weak reference SchedHandle map used to fetch quickly the list entries for pause,delete,etc
-    HashMap<void*, SchedHandle*> _schedIndexMap;
+    std::unordered_map<void*, SchedHandle*> _schedIndexMap;
 
     // the vector holds list entries that needs to be deleted after update
     tlx::pod_vector<SchedHandle*> _updateDeleteVector;
 
     // Used for "selectors with interval"
-    HashMap<void*, TimerHandle> _timersMap;
-    tlx::pod_vector<void*> _timerTargetKeys;
-    void* _currentTargetKey;
+    std::unordered_map<void*, TimerHandle> _timersMap;
+    struct TimerHandle* _currentTarget;
     bool _currentTargetSalvaged;
     // If true unschedule will not remove anything from a hash. Elements will only be marked for deletion.
     bool _indexMapLocked;

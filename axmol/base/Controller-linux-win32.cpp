@@ -26,8 +26,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
  ****************************************************************************/
 
-#include "axmol/base/HashMap.h"
-
 #include "axmol/base/Controller.h"
 
 #if (AX_TARGET_PLATFORM == AX_PLATFORM_LINUX || AX_TARGET_PLATFORM == AX_PLATFORM_WIN32)
@@ -94,8 +92,8 @@ public:
 
         // Create the necessary variables:
         std::string deviceName = "2Axes 11Keys Game  Pad";
-        ax::HashMap<int, int> buttonInputMap;
-        ax::HashMap<int, int> axisInputMap;
+        std::unordered_map<int, int> buttonInputMap;
+        std::unordered_map<int, int> axisInputMap;
 
         // Map the controller inputs to Controller::Key codes
         buttonInputMap[2] = Controller::Key::BUTTON_A;
@@ -4388,13 +4386,13 @@ private:
     // FIXME: Once GLFW 3.3 is bundled with cocos2d-x, remove these
     // controller profiles and all the related code.  We will only need to
     // provide a mapping from the GLFW gamepad key codes to the
-    // Controller::Key keycodes. So far an ax::HashMap<int,int>
+    // Controller::Key keycodes. So far an std::unordered_map<int,int>
     // should suffice.
-    static std::map<std::string, std::pair<ax::HashMap<int, int>, ax::HashMap<int, int>>>
+    static std::map<std::string, std::pair<std::unordered_map<int, int>, std::unordered_map<int, int>>>
         s_controllerProfiles;
 };
 
-std::map<std::string, std::pair<ax::HashMap<int, int>, ax::HashMap<int, int>>>
+std::map<std::string, std::pair<std::unordered_map<int, int>, std::unordered_map<int, int>>>
     ControllerImpl::s_controllerProfiles;
 
 void Controller::startDiscoveryController()

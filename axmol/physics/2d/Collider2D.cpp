@@ -29,6 +29,8 @@
 
 #    include <climits>
 #    include <cmath>
+#    include <unordered_map>
+
 #    include "axmol/physics/2d/Rigidbody2D.h"
 #    include "axmol/physics/2d/PhysicsWorld2D.h"
 #    include "axmol/physics/2d/PhysicsUtility2D.h"

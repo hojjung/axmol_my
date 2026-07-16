@@ -28,12 +28,11 @@ The RenderView for win32,linux,macos,wasm
 
 ****************************************************************************/
 
-#include "axmol/base/HashMap.h"
-
 #include "axmol/platform/pc/RenderView-pc.h"
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_set>
 #include "axmol/platform/Application.h"
 #include "axmol/base/Director.h"
 #include "axmol/base/PointerEvent.h"
@@ -1752,7 +1751,7 @@ void RenderView::onGLFWCharCallback(GLFWwindow* /*window*/, unsigned int charCod
         return;
 #endif
 
-    // static ax::HashSet<std::string_view> controlUnicode = {
+    // static std::unordered_set<std::string_view> controlUnicode = {
     //     "\xEF\x9C\x80",  // up
     //     "\xEF\x9C\x81",  // down
     //     "\xEF\x9C\x82",  // left
@@ -1765,21 +1764,18 @@ void RenderView::onGLFWCharCallback(GLFWwindow* /*window*/, unsigned int charCod
     //     "\xEF\x9C\xB9"   // clear
     // };
 
-    static const auto controlUnicode = [] {
-        ax::HashSet<char32_t> codepoints;
-        codepoints.reserve(10);
-        codepoints.emplace(U'\uF700');  // up
-        codepoints.emplace(U'\uF701');  // down
-        codepoints.emplace(U'\uF702');  // left
-        codepoints.emplace(U'\uF703');  // right
-        codepoints.emplace(U'\uF728');  // delete
-        codepoints.emplace(U'\uF729');  // home
-        codepoints.emplace(U'\uF72B');  // end
-        codepoints.emplace(U'\uF72C');  // pageup
-        codepoints.emplace(U'\uF72D');  // pagedown
-        codepoints.emplace(U'\uF739');  // clear
-        return codepoints;
-    }();
+    static const std::unordered_set<char32_t> controlUnicode = {
+        U'\uF700',  // up
+        U'\uF701',  // down
+        U'\uF702',  // left
+        U'\uF703',  // right
+        U'\uF728',  // delete
+        U'\uF729',  // home
+        U'\uF72B',  // end
+        U'\uF72C',  // pageup
+        U'\uF72D',  // pagedown
+        U'\uF739'   // clear
+    };
 
     // Check for send control key
 

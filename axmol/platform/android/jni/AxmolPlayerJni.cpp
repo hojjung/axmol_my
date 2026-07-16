@@ -22,8 +22,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ****************************************************************************/
-#include "axmol/base/HashMap.h"
-
 #include "axmol/base/InputSystem.h"
 #include "axmol/base/Director.h"
 #include "axmol/base/Scheduler.h"
@@ -86,20 +84,18 @@ static void axmolDispatchContextLost(bool isWarmStart)
 #define KEYCODE_PLAY        0x7e
 #define KEYCODE_DPAD_CENTER 0x17
 
-static const auto g_keyCodeMap = [] {
-    ax::HashMap<int, ax::KeyboardEvent::KeyCode> keyCodes;
-    keyCodes.reserve(9);
-    keyCodes.emplace(KEYCODE_BACK, ax::KeyboardEvent::KeyCode::KEY_ESCAPE);
-    keyCodes.emplace(KEYCODE_MENU, ax::KeyboardEvent::KeyCode::KEY_MENU);
-    keyCodes.emplace(KEYCODE_DPAD_UP, ax::KeyboardEvent::KeyCode::KEY_DPAD_UP);
-    keyCodes.emplace(KEYCODE_DPAD_DOWN, ax::KeyboardEvent::KeyCode::KEY_DPAD_DOWN);
-    keyCodes.emplace(KEYCODE_DPAD_LEFT, ax::KeyboardEvent::KeyCode::KEY_DPAD_LEFT);
-    keyCodes.emplace(KEYCODE_DPAD_RIGHT, ax::KeyboardEvent::KeyCode::KEY_DPAD_RIGHT);
-    keyCodes.emplace(KEYCODE_ENTER, ax::KeyboardEvent::KeyCode::KEY_ENTER);
-    keyCodes.emplace(KEYCODE_PLAY, ax::KeyboardEvent::KeyCode::KEY_PLAY);
-    keyCodes.emplace(KEYCODE_DPAD_CENTER, ax::KeyboardEvent::KeyCode::KEY_DPAD_CENTER);
-    return keyCodes;
-}();
+static std::unordered_map<int, ax::KeyboardEvent::KeyCode> g_keyCodeMap = {
+    {KEYCODE_BACK, ax::KeyboardEvent::KeyCode::KEY_ESCAPE},
+    {KEYCODE_MENU, ax::KeyboardEvent::KeyCode::KEY_MENU},
+    {KEYCODE_DPAD_UP, ax::KeyboardEvent::KeyCode::KEY_DPAD_UP},
+    {KEYCODE_DPAD_DOWN, ax::KeyboardEvent::KeyCode::KEY_DPAD_DOWN},
+    {KEYCODE_DPAD_LEFT, ax::KeyboardEvent::KeyCode::KEY_DPAD_LEFT},
+    {KEYCODE_DPAD_RIGHT, ax::KeyboardEvent::KeyCode::KEY_DPAD_RIGHT},
+    {KEYCODE_ENTER, ax::KeyboardEvent::KeyCode::KEY_ENTER},
+    {KEYCODE_PLAY, ax::KeyboardEvent::KeyCode::KEY_PLAY},
+    {KEYCODE_DPAD_CENTER, ax::KeyboardEvent::KeyCode::KEY_DPAD_CENTER},
+
+};
 
 struct TouchPoint
 {

@@ -27,6 +27,7 @@
 #pragma once
 
 #include <array>
+#include <unordered_map>
 #include <vector>
 #include "axmol/base/RefPtr.h"
 #include "axmol/renderer/RenderCommand.h"

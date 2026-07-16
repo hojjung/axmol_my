@@ -60,7 +60,6 @@ function(ax_link_cxx_prebuilt APP_NAME AX_ROOT_DIR AX_PREBUILT_DIR)
     PRIVATE NOUNCRYPT=1
     PRIVATE P2T_STATIC_EXPORTS=1
     PRIVATE BT_USE_SSE_IN_API=1
-    PRIVATE ENTT_NOEXCEPTION
   )
 
   if(AX_GLES_PROFILE)
@@ -106,7 +105,6 @@ function(ax_link_cxx_prebuilt APP_NAME AX_ROOT_DIR AX_PREBUILT_DIR)
     PRIVATE ${AX_ROOT_DIR}/3rdparty/robin-map/include
     PRIVATE ${AX_ROOT_DIR}/3rdparty/freetype/include
     PRIVATE ${AX_ROOT_DIR}/3rdparty/glfw/include/GLFW
-    PRIVATE ${AX_ROOT_DIR}/3rdparty/entt/src
     PRIVATE ${AX_ROOT_DIR}/3rdparty/box2d/include
     PRIVATE ${AX_ROOT_DIR}/${AX_PREBUILT_DIR}/engine/3rdparty/freetype/include
     PRIVATE ${AX_ROOT_DIR}/3rdparty/webp/src/webp

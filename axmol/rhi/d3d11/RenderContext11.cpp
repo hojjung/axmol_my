@@ -639,7 +639,7 @@ void RenderContextImpl::prepareDrawing()
     auto context = _driver->getContext();
 
     auto& callbackUniforms = _programState->getCallbackUniforms();
-    for (auto&& cb : callbackUniforms)
+    for (auto& cb : callbackUniforms)
         cb.second(_programState, cb.first);
 
     // bind shader

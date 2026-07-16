@@ -24,8 +24,6 @@
  THE SOFTWARE.
  ****************************************************************************/
 
-#include "axmol/base/HashMap.h"
-
 #include "axmol/platform/PlatformConfig.h"
 
 #include "axmol/audio/AudioEngine.h"
@@ -53,7 +51,7 @@ tlx::string_map<std::list<AudioId>> AudioEngine::_audioPathIDMap;
 tlx::string_map<AudioEngine::ProfileHelper> AudioEngine::_audioPathProfileHelperMap;
 AudioEngineSettings AudioEngine::_settings;
 AudioEngine::ProfileHelper* AudioEngine::_defaultProfileHelper = nullptr;
-ax::HashMap<AudioId, AudioEngine::AudioInfo> AudioEngine::_audioIDInfoMap;
+std::unordered_map<AudioId, AudioEngine::AudioInfo> AudioEngine::_audioIDInfoMap;
 AudioEngineImpl* AudioEngine::_audioEngineImpl = nullptr;
 AudioEngine::AudioInfo::AudioInfo()
     : profileHelper(nullptr), volume(1.0f), loop(false), duration(TIME_UNKNOWN), state(AudioState::INITIALIZING)

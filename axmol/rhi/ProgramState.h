@@ -25,10 +25,9 @@
 
 #pragma once
 
-#include "axmol/base/HashMap.h"
-
 #include <vector>
 #include <string>
+#include <unordered_map>
 #include <stdint.h>
 #include <functional>
 #include <span>
@@ -196,7 +195,7 @@ public:
      * Get the uniform callback function.
      * @return Uniform callback funciton.
      */
-    inline const ax::HashMap<UniformLocation, UniformCallback, UniformLocationHash>& getCallbackUniforms() const
+    inline const std::unordered_map<UniformLocation, UniformCallback, UniformLocationHash>& getCallbackUniforms() const
     {
         return _callbackUniforms;
     }
@@ -222,7 +221,7 @@ public:
      * Get vertex texture informations
      * @return Vertex texture informations. Key is the texture location, Value store the texture informations
      */
-    inline const ax::HashMap<int, TextureBindingSet>& getTextureBindingSets() const
+    inline const std::unordered_map<int, TextureBindingSet>& getTextureBindingSets() const
     {
         return _textureBindingSets;
     }
@@ -331,13 +330,13 @@ protected:
     void applyAutoBinding(std::string_view, std::string_view);
 
     rhi::Program* _program = nullptr;
-    ax::HashMap<UniformLocation, UniformCallback, UniformLocationHash> _callbackUniforms;
+    std::unordered_map<UniformLocation, UniformCallback, UniformLocationHash> _callbackUniforms;
 
     tlx::byte_buffer _uniformBuffer;
 
-    ax::HashMap<int, TextureBindingSet> _textureBindingSets;
+    std::unordered_map<int, TextureBindingSet> _textureBindingSets;
 
-    ax::StringHashMap<std::string> _autoBindings;
+    std::unordered_map<std::string, std::string> _autoBindings;
 
     static std::vector<AutoBindingResolver*> _customAutoBindingResolvers;
 

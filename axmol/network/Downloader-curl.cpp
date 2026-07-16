@@ -581,7 +581,7 @@ private:
         uint32_t countOfMaxProcessingTasks = this->hints.countOfMaxProcessingTasks;
         // init curl content
         CURLM* curlmHandle = curl_multi_init();
-        ax::HashMap<CURL*, std::shared_ptr<DownloadTask>> taskMap;
+        std::unordered_map<CURL*, std::shared_ptr<DownloadTask>> taskMap;
         int runningHandles = 0;
         CURLMcode mcode    = CURLM_OK;
         int rc             = 0;  // select return code

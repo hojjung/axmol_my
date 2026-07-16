@@ -2327,13 +2327,15 @@ void ParticleEmissionMaskCache::bakeEmissionMask(std::string_view maskId,
 
     auto fourccId = utils::fourccValue(maskId);
 
-    auto& mask = this->masks[fourccId];
-    if (!mask)
-        mask = std::make_unique<ParticleEmissionMaskDesc>();
+    auto iter = this->masks.find(fourccId);
+    if (iter == this->masks.end())
+        iter = this->masks.emplace(fourccId, ParticleEmissionMaskDesc{}).first;
 
-    auto& desc  = *mask;
+    ParticleEmissionMaskDesc desc;
     desc.size   = {float(w), float(h)};
     desc.points = std::move(points);
+
+    iter->second = desc;
 
     AXLOGD("Particle emission mask '{}' baked ({}x{}), {} samples generated taking {:.2f}mb of memory.", fourccId, w, h,
            desc.points.size(), desc.points.size() * 8 / 1e+6);
@@ -2344,12 +2346,12 @@ const ParticleEmissionMaskDesc& ParticleEmissionMaskCache::getEmissionMask(uint3
     auto iter = this->masks.find(fourccId);
     if (iter == this->masks.end())
     {
-        auto mask    = std::make_unique<ParticleEmissionMaskDesc>();
-        mask->size   = {float(1), float(1)};
-        mask->points = {{0, 0}};
-        iter         = this->masks.emplace(fourccId, std::move(mask)).first;
+        iter                = this->masks.emplace(fourccId, ParticleEmissionMaskDesc{}).first;
+        iter->second.size   = {float(1), float(1)};
+        iter->second.points = {{0, 0}};
+        return iter->second;
     }
-    return *iter->second;
+    return iter->second;
 }
 
 const ParticleEmissionMaskDesc& ParticleEmissionMaskCache::getEmissionMask(std::string_view maskId)
@@ -2359,12 +2361,12 @@ const ParticleEmissionMaskDesc& ParticleEmissionMaskCache::getEmissionMask(std::
     auto iter = this->masks.find(fourccId);
     if (iter == this->masks.end())
     {
-        auto mask    = std::make_unique<ParticleEmissionMaskDesc>();
-        mask->size   = {float(1), float(1)};
-        mask->points = {{0, 0}};
-        iter         = this->masks.emplace(fourccId, std::move(mask)).first;
+        iter                = this->masks.emplace(fourccId, ParticleEmissionMaskDesc{}).first;
+        iter->second.size   = {float(1), float(1)};
+        iter->second.points = {{0, 0}};
+        return iter->second;
     }
-    return *iter->second;
+    return iter->second;
 }
 
 void ParticleEmissionMaskCache::removeMask(std::string_view maskId)

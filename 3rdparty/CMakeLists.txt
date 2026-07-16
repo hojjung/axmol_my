@@ -63,8 +63,6 @@ else()
 endif()
 
 add_library(3rdparty INTERFACE)
-include(${_AX_ROOT}/cmake/Modules/AXEngineDependencies.cmake)
-ax_add_engine_dependencies()
 
 set(_1kfetch_cache_dir "${_AX_ROOT}/cache" CACHE STRING "" FORCE)
 

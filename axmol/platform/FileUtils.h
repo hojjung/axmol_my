@@ -28,6 +28,7 @@ THE SOFTWARE.
 
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <type_traits>
 #include <mutex>
 #include <memory>

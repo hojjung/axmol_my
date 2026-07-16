@@ -25,12 +25,13 @@
 // C++20 demo: Heterogeneous lookup for unordered containers (transparent hashing)
 // https://en.cppreference.com/w/cpp/container/unordered_map/find
 #pragma once
-#include <functional>
 #include <string>
 #include <string_view>
 #include <memory>
 #include <map>
 #include <set>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include "tsl/robin_map.h"
 #include "tsl/robin_set.h"

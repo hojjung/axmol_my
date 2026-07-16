@@ -29,9 +29,9 @@
 
 /// @cond DO_NOT_SHOW
 
-#include "axmol/base/HashMap.h"
-
 #include <string>
+#include <unordered_map>
+
 #include "axmol/platform/PlatformMacros.h"
 #include "axmol/base/Object.h"
 #include "axmol/platform/StdC.h"  // ssize_t on windows
@@ -87,7 +87,7 @@ public:
 
     const auto& getLetterDefinitions() const { return _letterDefinitions; }
 
-    const ax::HashMap<unsigned int, Texture2D*>& getTextures() const { return _atlasTextures; }
+    const std::unordered_map<unsigned int, Texture2D*>& getTextures() const { return _atlasTextures; }
 
     virtual void addNewPage();
 
@@ -147,11 +147,11 @@ protected:
 
     tlx::flat_set<char32_t> _newChars;
 
-    ax::HashMap<unsigned int, Texture2D*> _atlasTextures;
-    ax::HashMap<char32_t, FontLetterDefinition> _letterDefinitions;
+    std::unordered_map<unsigned int, Texture2D*> _atlasTextures;
+    std::unordered_map<char32_t, FontLetterDefinition> _letterDefinitions;
 
     StringMap<FontFreeType*> _missingFallbackFonts;  // maybe style no needs?
-    ax::HashMap<char32_t, std::pair<FontFreeType*, unsigned int>> _missingGlyphFallbackFonts;
+    std::unordered_map<char32_t, std::pair<FontFreeType*, unsigned int>> _missingGlyphFallbackFonts;
 
     Font* _font                 = nullptr;
     FontFreeType* _fontFreeType = nullptr;

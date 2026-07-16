@@ -1,10 +1,10 @@
-#include "axmol/base/HashMap.h"
-
 #include "Client/Content/MonsterCatalog.h"
 
 #include "axmol/platform/FileUtils.h"
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
+
+#include <unordered_set>
 
 namespace
 {
@@ -97,8 +97,8 @@ bool MonsterCatalog::load(std::string_view resourcePath, std::string& error)
         return false;
     }
 
-    ax::HashSet<int> unitIds;
-    ax::HashSet<std::string> nameKeys;
+    std::unordered_set<int> unitIds;
+    std::unordered_set<std::string> nameKeys;
     unitIds.reserve(characters->value.Size());
     nameKeys.reserve(characters->value.Size());
     _entries.reserve(characters->value.Size());

@@ -26,6 +26,7 @@
 #include "axmol/rhi/RenderPipeline.h"
 #include "axmol/tlx/hlookup.hpp"
 #include <glad/vulkan.h>
+#include <unordered_map>
 #include "axmol/tlx/vector.hpp"
 #include "yasio/object_pool.hpp"
 

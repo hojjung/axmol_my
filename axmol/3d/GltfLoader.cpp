@@ -22,8 +22,6 @@
  THE SOFTWARE.
  ****************************************************************************/
 
-#include "axmol/base/HashMap.h"
-
 #include "axmol/3d/GltfLoader.h"
 
 #define CGLTF_IMPLEMENTATION
@@ -44,6 +42,8 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -894,7 +894,7 @@ bool addTexture(const cgltf_data& data,
                 const cgltf_texture_view& view,
                 NTextureData::Usage usage,
                 std::string_view gltfPath,
-                ax::HashMap<const cgltf_image*, std::shared_ptr<const Data>>& embeddedImages,
+                std::unordered_map<const cgltf_image*, std::shared_ptr<const Data>>& embeddedImages,
                 NMaterialData& output)
 {
     if (!view.texture)
@@ -957,7 +957,7 @@ bool addTexture(const cgltf_data& data,
 
 bool buildMaterials(const cgltf_data& data, std::string_view gltfPath, MaterialDatas& output)
 {
-    ax::HashMap<const cgltf_image*, std::shared_ptr<const Data>> embeddedImages;
+    std::unordered_map<const cgltf_image*, std::shared_ptr<const Data>> embeddedImages;
     output.materials.reserve(data.materials_count);
     for (cgltf_size i = 0; i < data.materials_count; ++i)
     {
@@ -1016,7 +1016,7 @@ std::vector<Mat4> inverseBindMatrices(const cgltf_skin& skin)
 
 NodeData* cloneRenderNode(const cgltf_data& data,
                           const cgltf_node& source,
-                          const ax::HashMap<const cgltf_primitive*, std::string>& primitiveIds)
+                          const std::unordered_map<const cgltf_primitive*, std::string>& primitiveIds)
 {
     auto node       = std::make_unique<NodeData>();
     node->id        = nodeName(data, &source);
@@ -1054,7 +1054,7 @@ NodeData* cloneRenderNode(const cgltf_data& data,
 
 NodeData* cloneSkeletonNode(const cgltf_data& data,
                             const cgltf_node& source,
-                            const ax::HashSet<const cgltf_node*>& skeletonNodes)
+                            const std::unordered_set<const cgltf_node*>& skeletonNodes)
 {
     auto node       = std::make_unique<NodeData>();
     node->id        = nodeName(data, &source);
@@ -1068,10 +1068,10 @@ NodeData* cloneSkeletonNode(const cgltf_data& data,
 }
 
 void buildNodes(const cgltf_data& data,
-                const ax::HashMap<const cgltf_primitive*, std::string>& primitiveIds,
+                const std::unordered_map<const cgltf_primitive*, std::string>& primitiveIds,
                 NodeDatas& output)
 {
-    ax::HashSet<const cgltf_node*> skeletonNodes;
+    std::unordered_set<const cgltf_node*> skeletonNodes;
     for (cgltf_size skinIndex = 0; skinIndex < data.skins_count; ++skinIndex)
     {
         const cgltf_skin& skin = data.skins[skinIndex];
@@ -1104,7 +1104,7 @@ void buildNodes(const cgltf_data& data,
 
 bool buildMeshes(const cgltf_data& data,
                  MeshDatas& output,
-                 ax::HashMap<const cgltf_primitive*, std::string>& primitiveIds)
+                 std::unordered_map<const cgltf_primitive*, std::string>& primitiveIds)
 {
     for (cgltf_size meshIndex = 0; meshIndex < data.meshes_count; ++meshIndex)
     {
@@ -1144,7 +1144,7 @@ bool loadAnimationData(const cgltf_data& data, std::string_view animationName, A
         return false;
 
     output._usesAbsoluteLocalTransforms = true;
-    ax::HashSet<const cgltf_node*> animatedNodes;
+    std::unordered_set<const cgltf_node*> animatedNodes;
 
     for (cgltf_size i = 0; i < animation->channels_count; ++i)
     {
@@ -1266,7 +1266,7 @@ bool GltfLoader::load(std::string_view path, NodeDatas& nodeDatas, MeshDatas& me
     ParsedAsset asset;
     if (!asset.open(path))
         return false;
-    ax::HashMap<const cgltf_primitive*, std::string> primitiveIds;
+    std::unordered_map<const cgltf_primitive*, std::string> primitiveIds;
     if (!buildMeshes(asset.data(), meshDatas, primitiveIds))
     {
         meshDatas.resetData();

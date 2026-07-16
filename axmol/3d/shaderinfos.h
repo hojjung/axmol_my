@@ -4,6 +4,7 @@
 #include "axmol/base/Macros.h"
 #include "axmol/math/Math.h"
 
+#include <unordered_map>
 #include <vector>
 
 namespace ax

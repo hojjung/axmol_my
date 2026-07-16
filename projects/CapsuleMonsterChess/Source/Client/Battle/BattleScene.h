@@ -1,13 +1,13 @@
 #pragma once
 
-#include "axmol/base/HashMap.h"
-
 #include "Client/Battle/BattlePresentationRequest.h"
 #include "Client/Content/MonsterCatalog.h"
 #include "axmol/axmol.h"
 #include "cmc/game_core/BattleSimulator.h"
 
 #include <cstddef>
+#include <unordered_map>
+
 namespace cmc::client
 {
 class BattleScene final : public ax::Scene
@@ -45,7 +45,7 @@ private:
     MonsterCatalog _monsterCatalog;
     cmc::game_core::BattleSimulateRequest _simulationRequest;
     cmc::game_core::BattleSimulateResult _simulationResult;
-    ax::HashMap<int, UnitPresentation> _units;
+    std::unordered_map<int, UnitPresentation> _units;
     ax::Node* _battleWorldRoot   = nullptr;
     ax::Node* _resultRoot        = nullptr;
     ax::Node* _playerCountLabel  = nullptr;

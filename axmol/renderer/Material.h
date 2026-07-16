@@ -31,6 +31,8 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
+
 #include "axmol/renderer/RenderState.h"
 #include "axmol/renderer/Technique.h"
 #include "axmol/renderer/CustomCommand.h"

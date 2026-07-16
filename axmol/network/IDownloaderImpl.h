@@ -27,6 +27,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 #include <memory>
 
 #include "axmol/base/Logging.h"

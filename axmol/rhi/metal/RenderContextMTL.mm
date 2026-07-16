@@ -546,7 +546,7 @@ void RenderContextImpl::setUniformBuffer() const
     if (_programState)
     {
         auto& callbackUniforms = _programState->getCallbackUniforms();
-        for (auto&& cb : callbackUniforms)
+        for (auto& cb : callbackUniforms)
             cb.second(_programState, cb.first);
 
         auto& cpuBuffer = _programState->getUniformBuffer();

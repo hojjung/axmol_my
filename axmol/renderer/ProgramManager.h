@@ -25,10 +25,9 @@
 
 #pragma once
 
-#include "axmol/base/HashMap.h"
-
 #include "axmol/platform/PlatformMacros.h"
 #include <string>
+#include <unordered_map>
 #include <string_view>
 #include "axmol/rhi/Program.h"
 #include "axmol/renderer/ProgramStateRegistry.h"
@@ -153,9 +152,9 @@ protected:
     };
 
     BuiltinRegInfo _builtinRegistry[(int)rhi::ProgramType::BUILTIN_COUNT];
-    ax::HashMap<uint64_t, BuiltinRegInfo> _customRegistry;
+    std::unordered_map<uint64_t, BuiltinRegInfo> _customRegistry;
 
-    ax::HashMap<uint64_t, Program*> _cachedPrograms;  ///< The cached program object.
+    std::unordered_map<uint64_t, Program*> _cachedPrograms;  ///< The cached program object.
 
     XXH64_state_s* _programIdGen;
 

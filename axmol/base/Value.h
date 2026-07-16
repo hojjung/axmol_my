@@ -26,12 +26,12 @@
 
 #pragma once
 
-#include "axmol/base/HashMap.h"
-
 #include "axmol/platform/PlatformMacros.h"
 #include "axmol/base/Macros.h"
 #include <string>
 #include <vector>
+#include <unordered_map>
+
 /**
  * @addtogroup base
  * @{
@@ -44,7 +44,7 @@ class Value;
 
 typedef std::vector<Value> ValueVector;
 typedef tlx::string_map<Value> ValueMap;
-typedef ax::HashMap<int, Value> ValueMapIntKey;
+typedef std::unordered_map<int, Value> ValueMapIntKey;
 
 AX_DLL extern const ValueVector ValueVectorNull;
 AX_DLL extern const ValueMap ValueMapNull;

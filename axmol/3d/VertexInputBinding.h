@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <unordered_map>
+
 #include "axmol/base/Object.h"
 #include "axmol/rhi/ProgramState.h"
 #include "axmol/renderer/Pass.h"

@@ -26,8 +26,6 @@
  THE SOFTWARE.
  ****************************************************************************/
 
-#include "axmol/base/HashMap.h"
-
 #include "axmol/ui/EditBox/EditBoxImpl-android.h"
 
 #if (AX_TARGET_PLATFORM == AX_PLATFORM_ANDROID)
@@ -56,7 +54,7 @@ static void editBoxEditingDidBegin(int index);
 static void editBoxEditingDidChanged(int index, std::string_view text);
 static void editBoxEditingDidEnd(int index, std::string_view text, int action);
 
-static ax::HashMap<int, EditBoxImplAndroid*> s_allEditBoxes;
+static std::unordered_map<int, EditBoxImplAndroid*> s_allEditBoxes;
 
 EditBoxImpl* __createSystemEditBox(EditBox* editBox)
 {

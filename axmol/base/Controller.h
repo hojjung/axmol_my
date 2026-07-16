@@ -32,6 +32,7 @@
 #    include "axmol/platform/PlatformMacros.h"
 #    include <array>
 #    include <string>
+#    include <unordered_map>
 #    include <vector>
 namespace ax
 {
@@ -238,8 +239,8 @@ private:
     // usage is negligible.  Peformance over memory optimization was
     // consciously chosen.
 
-    ax::HashMap<int, int> _buttonInputMap;
-    ax::HashMap<int, int> _axisInputMap;
+    std::unordered_map<int, int> _buttonInputMap;
+    std::unordered_map<int, int> _axisInputMap;
 #    endif
 
     friend class ControllerImpl;

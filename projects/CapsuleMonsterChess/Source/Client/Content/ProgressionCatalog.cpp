@@ -1,11 +1,11 @@
-#include "axmol/base/HashMap.h"
-
 #include "Client/Content/ProgressionCatalog.h"
 
 #include "axmol/platform/FileUtils.h"
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
 
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 namespace
@@ -87,8 +87,8 @@ bool ProgressionCatalog::load(std::string_view resourcePath, std::string& error)
         return false;
     }
 
-    ax::HashSet<int> questIds;
-    ax::HashMap<int, std::string> questCategories;
+    std::unordered_set<int> questIds;
+    std::unordered_map<int, std::string> questCategories;
     questIds.reserve(quests->value.Size());
     questCategories.reserve(quests->value.Size());
     _quests.reserve(quests->value.Size());
@@ -145,7 +145,7 @@ bool ProgressionCatalog::load(std::string_view resourcePath, std::string& error)
         return false;
     }
 
-    ax::HashSet<int> tierIds;
+    std::unordered_set<int> tierIds;
     tierIds.reserve(tiers->value.Size());
     _battlePass.tiers.reserve(tiers->value.Size());
     int expectedTier = 1;

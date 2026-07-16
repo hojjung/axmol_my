@@ -24,8 +24,6 @@
  THE SOFTWARE.
  ****************************************************************************/
 
-#include "axmol/base/HashMap.h"
-
 #include "axmol/3d/Animate3D.h"
 #include "axmol/3d/MeshRenderer.h"
 #include "axmol/3d/Skeleton3D.h"
@@ -38,9 +36,9 @@
 namespace ax
 {
 
-ax::HashMap<Node*, Animate3D*> Animate3D::s_fadeInAnimates;
-ax::HashMap<Node*, Animate3D*> Animate3D::s_fadeOutAnimates;
-ax::HashMap<Node*, Animate3D*> Animate3D::s_runningAnimates;
+std::unordered_map<Node*, Animate3D*> Animate3D::s_fadeInAnimates;
+std::unordered_map<Node*, Animate3D*> Animate3D::s_fadeOutAnimates;
+std::unordered_map<Node*, Animate3D*> Animate3D::s_runningAnimates;
 float Animate3D::_transTime = 0.1f;
 
 // create Animate3D using Animation.
@@ -420,13 +418,10 @@ void Animate3D::update(float t)
                             auto& frameEvent = _keyFrameEvent[keyFrame.first];
                             if (frameEvent == nullptr)
                                 frameEvent = new CustomEvent(Animate3DDisplayedNotification);
-                            auto& eventInfoSlot = _displayedEventInfo[keyFrame.first];
-                            if (!eventInfoSlot)
-                                eventInfoSlot = std::make_unique<Animate3DDisplayedEventInfo>();
-                            auto* eventInfo     = eventInfoSlot.get();
+                            auto eventInfo      = &_displayedEventInfo[keyFrame.first];
                             eventInfo->target   = _target;
                             eventInfo->frame    = keyFrame.first;
-                            eventInfo->userInfo = keyFrame.second.get();
+                            eventInfo->userInfo = &_keyFrameUserInfos[keyFrame.first];
                             eventInfos.emplace_back(eventInfo);
                             frameEvent->setUserData((void*)eventInfo);
                         }
@@ -490,7 +485,7 @@ const ValueMap* Animate3D::getKeyFrameUserInfo(int keyFrame) const
 {
     auto iter = _keyFrameUserInfos.find(keyFrame);
     if (iter != _keyFrameUserInfos.end())
-        return iter->second.get();
+        return &iter->second;
 
     return nullptr;
 }
@@ -499,18 +494,14 @@ ValueMap* Animate3D::getKeyFrameUserInfo(int keyFrame)
 {
     auto iter = _keyFrameUserInfos.find(keyFrame);
     if (iter != _keyFrameUserInfos.end())
-        return iter->second.get();
+        return &iter->second;
 
     return nullptr;
 }
 
 void Animate3D::setKeyFrameUserInfo(int keyFrame, const ValueMap& userInfo)
 {
-    const auto iter = _keyFrameUserInfos.find(keyFrame);
-    if (iter == _keyFrameUserInfos.end())
-        _keyFrameUserInfos.emplace(keyFrame, std::make_unique<ValueMap>(userInfo));
-    else
-        *iter->second = userInfo;
+    _keyFrameUserInfos[keyFrame] = userInfo;
 }
 
 Animate3D::Animate3D()

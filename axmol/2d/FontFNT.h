@@ -29,10 +29,10 @@
 
 /// @cond DO_NOT_SHOW
 
-#include "axmol/base/HashMap.h"
-
 #include "axmol/2d/Font.h"
 #include <set>
+#include <unordered_map>
+
 namespace ax
 {
 
@@ -78,7 +78,7 @@ class AX_DLL BMFontConfiguration : public Object
     // FIXME: Creating a public interface so that the bitmapFontArray[] is accessible
 public:  //@public
     // BMFont definitions
-    ax::HashMap<int /* key */, BMFontDef /* fontDef */> _fontDefDictionary;
+    std::unordered_map<int /* key */, BMFontDef /* fontDef */> _fontDefDictionary;
 
     //! FNTConfig: Common Height Should be signed (issue #1343)
     int _commonHeight;
@@ -90,7 +90,7 @@ public:  //@public
     std::string _atlasName;
 
     //! values for kerning
-    ax::HashMap<uint64_t /* key */, int /* amount */> _kerningDictionary;
+    std::unordered_map<uint64_t /* key */, int /* amount */> _kerningDictionary;
 
     // Character Set defines the letters that actually exist in the font
     std::set<unsigned int> _characterSet;

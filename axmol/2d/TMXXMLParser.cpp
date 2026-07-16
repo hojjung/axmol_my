@@ -29,6 +29,7 @@ THE SOFTWARE.
 ****************************************************************************/
 
 #include "axmol/2d/TMXXMLParser.h"
+#include <unordered_map>
 #include <sstream>
 #include <regex>
 

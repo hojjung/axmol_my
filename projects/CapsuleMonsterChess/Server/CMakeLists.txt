@@ -65,7 +65,6 @@ target_include_directories(cmc_axmol_headless
   PUBLIC
     "${CMC_AXMOL_ROOT}"
     "${CMC_AXMOL_ROOT}/3rdparty/fmt/include"
-    "${CMC_AXMOL_ROOT}/3rdparty/entt/src"
     "${CMC_AXMOL_ROOT}/3rdparty/robin-map/include"
     "${CMC_AXMOL_ROOT}/3rdparty/yasio"
 )
@@ -73,7 +72,6 @@ target_compile_definitions(cmc_axmol_headless
   PUBLIC
     AX_HEADLESS_SERVER=1
     AX_ENABLE_SCRIPT_BINDING=0
-    ENTT_NOEXCEPTION
     _AX_DEBUG=0
 )
 target_link_libraries(cmc_axmol_headless PRIVATE Threads::Threads)

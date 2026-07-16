@@ -220,7 +220,7 @@ const int Scheduler::PRIORITY_NON_SYSTEM_MIN = PRIORITY_SYSTEM + 1;
 
 Scheduler::Scheduler()
     : _timeScale(1.0f)
-    , _currentTargetKey(nullptr)
+    , _currentTarget(nullptr)
     , _currentTargetSalvaged(false)
     , _indexMapLocked(false)
 #if AX_ENABLE_SCRIPT_BINDING
@@ -326,7 +326,7 @@ void Scheduler::unschedule(std::string_view key, void* target)
 
                 if (timerHandle.timers.empty())
                 {
-                    if (_currentTargetKey == target)
+                    if (_currentTarget == &timerHandle)
                     {
                         _currentTargetSalvaged = true;
                     }
@@ -558,7 +558,7 @@ void Scheduler::unscheduleAllForTarget(void* target)
         unscheduleUpdate(target);
 }
 
-void Scheduler::unscheduleAllForTarget(HashMap<void*, TimerHandle>::iterator& timerIt)
+void Scheduler::unscheduleAllForTarget(std::unordered_map<void*, TimerHandle>::iterator& timerIt)
 {
     auto const target = timerIt->first;
     auto& timerHandle = timerIt->second;
@@ -569,7 +569,7 @@ void Scheduler::unscheduleAllForTarget(HashMap<void*, TimerHandle>::iterator& ti
     }
     timerHandle.timers.clear();
 
-    if (_currentTargetKey == target)
+    if (_currentTarget == &timerHandle)
     {
         _currentTargetSalvaged = true;
         ++timerIt;
@@ -674,7 +674,7 @@ std::set<void*> Scheduler::pauseAllTargetsWithMinPriority(int minPriority)
     std::set<void*> idsWithSelectors;
 
     // Custom Selectors
-    for (auto&& [target, timerHandle] : _timersMap)
+    for (auto& [target, timerHandle] : _timersMap)
     {
         timerHandle.paused = true;
         idsWithSelectors.insert(target);
@@ -768,78 +768,42 @@ void Scheduler::update(float dt)
         }
     }
 
-    _timerTargetKeys.clear();
-    _timerTargetKeys.reserve(_timersMap.size());
-    for (auto&& [target, _] : _timersMap)
-    {
-        _timerTargetKeys.emplace_back(target);
-    }
-
     // Iterate over all the custom selectors
-    for (void* target : _timerTargetKeys)
+    for (auto it = _timersMap.begin(); it != _timersMap.end();)
     {
-        auto timerIt = _timersMap.find(target);
-        if (timerIt == _timersMap.end())
-        {
-            continue;
-        }
-
-        _currentTargetKey      = target;
+        auto elt               = &it->second;
+        _currentTarget         = elt;
         _currentTargetSalvaged = false;
 
-        if (!timerIt->second.paused)
+        if (!_currentTarget->paused)
         {
             // The 'timers' array may change while inside this loop
-            timerIt->second.timerIndex = 0;
-            while (true)
+            for (elt->timerIndex = 0; elt->timerIndex < elt->timers.size(); ++(elt->timerIndex))
             {
-                timerIt = _timersMap.find(target);
-                if (timerIt == _timersMap.end())
-                {
-                    break;
-                }
+                elt->currentTimer = elt->timers[elt->timerIndex];
+                AXASSERT(!elt->currentTimer->isAborted(), "An aborted timer should not be updated");
 
-                auto& timerHandle = timerIt->second;
-                if (timerHandle.timerIndex >= timerHandle.timers.size())
-                {
-                    break;
-                }
+                elt->currentTimer->update(dt);
 
-                Timer* timer             = timerHandle.timers[timerHandle.timerIndex];
-                timerHandle.currentTimer = timer;
-                AXASSERT(!timer->isAborted(), "An aborted timer should not be updated");
-
-                timer->update(dt);
-
-                timerIt = _timersMap.find(target);
-                if (timerIt == _timersMap.end())
-                {
-                    break;
-                }
-
-                auto& refreshedHandle = timerIt->second;
-                if (timer->isAborted())
+                if (elt->currentTimer->isAborted())
                 {
                     // The currentTimer told the remove itself. To prevent the timer from
                     // accidentally deallocating itself before finishing its step, we retained
                     // it. Now that step is done, it's safe to release it.
-                    refreshedHandle.currentTimer = nullptr;
-                    timer->release();
+                    elt->currentTimer->release();
                 }
 
-                refreshedHandle.currentTimer = nullptr;
-                ++refreshedHandle.timerIndex;
+                elt->currentTimer = nullptr;
             }
         }
 
-        timerIt = _timersMap.find(target);
         // only delete currentTarget if no actions were scheduled during the cycle (issue #481)
-        if (timerIt != _timersMap.end() && _currentTargetSalvaged && timerIt->second.timers.empty())
+        if (_currentTargetSalvaged && _currentTarget->timers.empty())
         {
-            _timersMap.erase(timerIt);
+            it = _timersMap.erase(it);
         }
-
-        _currentTargetKey = nullptr;
+        else
+            ++it;
     }
 
     // delete all updates that are removed in update
@@ -851,8 +815,8 @@ void Scheduler::update(float dt)
 
     _updateDeleteVector.clear();
 
-    _indexMapLocked   = false;
-    _currentTargetKey = nullptr;
+    _indexMapLocked = false;
+    _currentTarget  = nullptr;
 
 #if AX_ENABLE_SCRIPT_BINDING
     //
@@ -987,7 +951,7 @@ void Scheduler::unschedule(SEL_SCHEDULE selector, Object* target)
 
                 if (timers.empty())
                 {
-                    if (_currentTargetKey == target)
+                    if (_currentTarget == &timerHandle)
                     {
                         _currentTargetSalvaged = true;
                     }

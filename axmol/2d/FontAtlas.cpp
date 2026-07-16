@@ -244,7 +244,7 @@ void FontAtlas::initWithSettings(void* opaque /*simdjson::ondemand::document*/)
 
 void FontAtlas::reset()
 {
-    for (auto&& [_, texture] : _atlasTextures)
+    for (auto& [_, texture] : _atlasTextures)
     {
         texture->invalidate();
     }

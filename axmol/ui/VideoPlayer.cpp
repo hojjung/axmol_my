@@ -29,6 +29,7 @@
 
 // Now, common implementation based on redesigned MediaEngine is enable for windows and macOS
 #if defined(AX_ENABLE_VIDEO)
+#    include <unordered_map>
 #    include <stdlib.h>
 #    include <string>
 #    include "axmol/base/Director.h"

@@ -40,7 +40,7 @@ namespace ax
 // singleton stuff
 //
 
-ActionManager::ActionManager() : _currentTargetKey(nullptr), _currentTargetSalvaged(false) {}
+ActionManager::ActionManager() : _currentTarget(nullptr), _currentTargetSalvaged(false) {}
 
 ActionManager::~ActionManager()
 {
@@ -64,7 +64,7 @@ void ActionManager::reserveActionCapacity(ActionHandle& element)
 }
 void ActionManager::removeActionAtIndex(ssize_t index,
                                         ActionHandle& element,
-                                        HashMap<Node*, ActionHandle>::iterator actionIt)
+                                        std::unordered_map<Node*, ActionHandle>::iterator actionIt)
 {
     Action* action = static_cast<Action*>(element.actions[index]);
 
@@ -84,7 +84,7 @@ void ActionManager::removeActionAtIndex(ssize_t index,
 
     if (element.actions.empty())
     {
-        if (_currentTargetKey == actionIt->first)
+        if (_currentTarget == &element)
         {
             _currentTargetSalvaged = true;
         }
@@ -118,7 +118,7 @@ Vector<Node*> ActionManager::pauseAllRunningActions()
 {
     Vector<Node*> idsWithActions;
 
-    for (auto&& [target, element] : _targets)
+    for (auto& [target, element] : _targets)
     {
         element.paused = true;
         idsWithActions.pushBack(const_cast<Node*>(target));
@@ -182,7 +182,7 @@ void ActionManager::removeAllActionsFromTarget(Node* target)
         removeTargetActionHandle(actionIt);
 }
 
-void ActionManager::removeTargetActionHandle(HashMap<Node*, ActionHandle>::iterator& actionIt)
+void ActionManager::removeTargetActionHandle(std::unordered_map<Node*, ActionHandle>::iterator& actionIt)
 {
     auto& element = actionIt->second;
     if (element.actions.contains(element.currentAction) && !element.currentActionSalvaged)
@@ -192,7 +192,7 @@ void ActionManager::removeTargetActionHandle(HashMap<Node*, ActionHandle>::itera
     }
 
     element.actions.clear();
-    if (_currentTargetKey == actionIt->first)
+    if (_currentTarget == &element)
     {
         _currentTargetSalvaged = true;
         ++actionIt;
@@ -203,7 +203,7 @@ void ActionManager::removeTargetActionHandle(HashMap<Node*, ActionHandle>::itera
     }
 }
 
-void ActionManager::eraseTargetActionHandle(HashMap<Node*, ActionHandle>::iterator& actionIt)
+void ActionManager::eraseTargetActionHandle(std::unordered_map<Node*, ActionHandle>::iterator& actionIt)
 {
     actionIt->first->release();
     actionIt = _targets.erase(actionIt);
@@ -384,7 +384,7 @@ size_t ActionManager::getNumberOfRunningActionsInTargetByTag(const Node* target,
 ssize_t ActionManager::getNumberOfRunningActions() const
 {
     ssize_t count = 0;
-    for (auto&& [_, element] : _targets)
+    for (auto& [_, element] : _targets)
         count += element.actions.size();
     return count;
 }
@@ -392,121 +392,66 @@ ssize_t ActionManager::getNumberOfRunningActions() const
 // main loop
 void ActionManager::update(float dt)
 {
-    _targetKeys.clear();
-    _targetKeys.reserve(_targets.size());
-    for (auto&& [target, _] : _targets)
+    for (auto actionIt = _targets.begin(); actionIt != _targets.end();)
     {
-        _targetKeys.emplace_back(target);
-    }
-
-    for (Node* target : _targetKeys)
-    {
-        auto actionIt = _targets.find(target);
-        if (actionIt == _targets.end())
-        {
-            continue;
-        }
-
-        _currentTargetKey      = target;
+        auto elt               = &actionIt->second;
+        _currentTarget         = elt;
         _currentTargetSalvaged = false;
 
-        if (!actionIt->second.paused)
+        if (!_currentTarget->paused)
         {
             // The 'actions' MutableArray may change while inside this loop.
-            actionIt->second.actionIndex = 0;
-            while (true)
+            for (_currentTarget->actionIndex = 0; _currentTarget->actionIndex < _currentTarget->actions.size();
+                 _currentTarget->actionIndex++)
             {
-                actionIt = _targets.find(target);
-                if (actionIt == _targets.end())
+                _currentTarget->currentAction =
+                    static_cast<Action*>(_currentTarget->actions[_currentTarget->actionIndex]);
+                if (_currentTarget->currentAction == nullptr)
                 {
-                    break;
-                }
-
-                auto& actionHandle = actionIt->second;
-                if (actionHandle.actionIndex >= actionHandle.actions.size())
-                {
-                    break;
-                }
-
-                Action* action = static_cast<Action*>(actionHandle.actions[actionHandle.actionIndex]);
-                actionHandle.currentAction = action;
-                if (action == nullptr)
-                {
-                    ++actionHandle.actionIndex;
                     continue;
                 }
 
-                actionHandle.currentActionSalvaged = false;
-                action->step(dt);
+                _currentTarget->currentActionSalvaged = false;
 
-                actionIt = _targets.find(target);
-                if (actionIt == _targets.end())
-                {
-                    break;
-                }
+                _currentTarget->currentAction->step(dt);
 
-                auto& refreshedHandle = actionIt->second;
-                if (refreshedHandle.currentActionSalvaged)
+                if (_currentTarget->currentActionSalvaged)
                 {
                     // The currentAction told the node to remove it. To prevent the action from
                     // accidentally deallocating itself before finishing its step, we retained
                     // it. Now that step is done, it's safe to release it.
-                    refreshedHandle.currentAction = nullptr;
-                    action->release();
+                    _currentTarget->currentAction->release();
                 }
-                else if (action->isDone())
+                else if (_currentTarget->currentAction->isDone())
                 {
-                    action->stop();
+                    _currentTarget->currentAction->stop();
 
-                    actionIt = _targets.find(target);
-                    if (actionIt == _targets.end())
-                    {
-                        break;
-                    }
-
-                    auto& stoppedHandle = actionIt->second;
-                    const bool salvagedDuringStop = stoppedHandle.currentActionSalvaged;
-                    stoppedHandle.currentAction    = nullptr;
-                    if (salvagedDuringStop)
-                    {
-                        action->release();
-                    }
-                    else
-                    {
-                        removeAction(action);
-                    }
+                    Action* action = _currentTarget->currentAction;
+                    // Make currentAction nil to prevent removeAction from salvaging it.
+                    _currentTarget->currentAction = nullptr;
+                    removeAction(action);
                 }
 
-                actionIt = _targets.find(target);
-                if (actionIt == _targets.end())
-                {
-                    break;
-                }
-
-                actionIt->second.currentAction = nullptr;
-                ++actionIt->second.actionIndex;
+                _currentTarget->currentAction = nullptr;
             }
         }
 
-        actionIt = _targets.find(target);
-        if (actionIt == _targets.end())
-        {
-            _currentTargetKey = nullptr;
-            continue;
-        }
+        // elt, at this moment, is still valid
+        // so it is safe to ask this here (issue #490)
+        // elt = (tHashElement*)(elt->hh.next);
 
         // only delete currentTarget if no actions were scheduled during the cycle (issue #481)
         // if some node reference 'target', it's reference count >= 2 (issues #14050)
-        if ((_currentTargetSalvaged && actionIt->second.actions.empty()) || target->getReferenceCount() == 1)
+        if ((_currentTargetSalvaged && _currentTarget->actions.empty()) || actionIt->first->getReferenceCount() == 1)
         {
             eraseTargetActionHandle(actionIt);
         }
-
-        _currentTargetKey = nullptr;
+        else
+            ++actionIt;
     }
 
     // issue #635
-    _currentTargetKey = nullptr;
+    _currentTarget = nullptr;
 }
 
 }  // namespace ax

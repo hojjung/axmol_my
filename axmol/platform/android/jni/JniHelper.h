@@ -26,11 +26,10 @@ THE SOFTWARE.
 ****************************************************************************/
 #pragma once
 
-#include "axmol/base/HashMap.h"
-
 #include <jni.h>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <functional>
 #include <type_traits>
 #include "axmol/platform/PlatformMacros.h"
@@ -75,7 +74,7 @@ typedef struct JniMethodInfo_
 class AX_DLL JniHelper
 {
 public:
-    typedef ax::HashMap<JNIEnv*, std::vector<jobject>> LocalRefMapType;
+    typedef std::unordered_map<JNIEnv*, std::vector<jobject>> LocalRefMapType;
 
     static void setJavaVM(JavaVM* javaVM);
     static JavaVM* getJavaVM();

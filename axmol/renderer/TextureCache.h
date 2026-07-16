@@ -34,6 +34,7 @@ THE SOFTWARE.
 #include <condition_variable>
 #include <queue>
 #include <string>
+#include <unordered_map>
 #include <functional>
 #include <memory>
 

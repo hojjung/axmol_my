@@ -58,7 +58,6 @@ set(_AX_BASE_HEADER
   base/Config.h
   base/FPSImages.h
   base/ZipUtils.h
-  base/HashMap.h
   base/Map.h
   base/text_utils.h
   base/ScriptSupport.h

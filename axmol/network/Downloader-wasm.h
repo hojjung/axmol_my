@@ -25,8 +25,6 @@
 
 #pragma once
 
-#include "axmol/base/HashMap.h"
-
 #include "axmol/network/IDownloaderImpl.h"
 #include "axmol/network/Downloader.h"
 #include <emscripten/fetch.h>
@@ -55,7 +53,7 @@ protected:
 
     DownloaderHints hints;
 
-    ax::HashMap<emscripten_fetch_t*, DownloadContextEmscripten*> _taskMap;
+    std::unordered_map<emscripten_fetch_t*, DownloadContextEmscripten*> _taskMap;
 
     static void onError(emscripten_fetch_t* fetch);
 

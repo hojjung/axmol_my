@@ -26,6 +26,8 @@
 
 #pragma once
 
+#include <unordered_map>
+
 #include "axmol/base/Vector.h"
 #include "axmol/base/Types.h"
 #include "axmol/base/Protocols.h"

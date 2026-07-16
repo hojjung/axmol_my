@@ -27,8 +27,6 @@ THE SOFTWARE.
 
 #pragma once
 
-#include "axmol/base/HashMap.h"
-
 #include "axmol/platform/winrt/StdC-winrt.h"
 #include "axmol/platform/Common.h"
 #include "axmol/platform/RenderViewCore.h"
@@ -196,7 +194,7 @@ protected:
 #endif
 
     // keyboard support
-    ax::HashMap<int, KeyboardEvent::KeyCode> _keyCodeMap;
+    std::unordered_map<int, KeyboardEvent::KeyCode> _keyCodeMap;
     Windows::UI::Xaml::Controls::TextBox _textBox{nullptr};
     bool _useInputMethod{false};
 

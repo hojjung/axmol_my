@@ -1,12 +1,12 @@
 #pragma once
 
-#include "axmol/base/HashMap.h"
-
 #include "axmol/platform/PlatformMacros.h"
 #include "axmol/rhi/Program.h"
 #include "axmol/rhi/ProgramState.h"
 
 #include <string>
+#include <unordered_map>
+
 namespace ax
 {
 
@@ -32,7 +32,7 @@ public:
     uint32_t getProgramType(uint32_t programType, int textureSamplerFlags);
 
 protected:
-    ax::HashMap<uint32_t, uint32_t> _registry;
+    std::unordered_map<uint32_t, uint32_t> _registry;
 };
 
 // end of _renderer group

@@ -27,6 +27,8 @@
 #include "axmol/rhi/DXUtils.h"
 #include "axmol/tlx/hlookup.hpp"
 #include <d3d12.h>
+#include <unordered_map>
+
 namespace ax::rhi::d3d12
 {
 class DepthStencilStateImpl;
