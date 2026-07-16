@@ -52,13 +52,9 @@ THE SOFTWARE.
 #    elif AX_TARGET_PLATFORM == AX_PLATFORM_LINUX
 #        include "glad/gl.h"
 #    elif AX_TARGET_PLATFORM == AX_PLATFORM_WASM
-#        if AX_PROFILE_STYLIZED_WEB
-#            define GL_GLEXT_PROTOTYPES 1
-#            include <GLES3/gl3.h>
-#            include <GLES3/gl2ext.h>
-#        else
-#            include "glad/gles2.h"
-#        endif
+#        define GL_GLEXT_PROTOTYPES 1
+#        include <GLES3/gl3.h>
+#        include <GLES3/gl2ext.h>
 #    elif AX_TARGET_PLATFORM == AX_PLATFORM_IOS
 #        include <OpenGLES/ES3/gl.h>
 #        include <OpenGLES/ES3/glext.h>

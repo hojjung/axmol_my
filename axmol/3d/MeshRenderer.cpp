@@ -528,7 +528,7 @@ void MeshRenderer::setMaterial(Material* material, int meshIndex)
 
     bool sourceMaterialApplied = false;
     const auto materialForMesh = [material, &sourceMaterialApplied](Mesh* mesh) -> Material* {
-        if (auto* stylized = dynamic_cast<StylizedMaterial*>(material))
+        if (auto* stylized = material->asStylizedMaterial())
         {
             const bool meshIsSkinned = mesh->getSkin() != nullptr;
             if (stylized->isSkinned() != meshIsSkinned)
@@ -698,7 +698,7 @@ void MeshRenderer::genMaterial(bool useLight)
     {
         for (auto&& mesh : _meshes)
         {
-            if (dynamic_cast<StylizedMaterial*>(mesh->getMaterial()))
+            if (mesh->getStylizedMaterial())
                 continue;
 
             StylizedMaterialDesc desc;
@@ -1268,7 +1268,7 @@ void MeshRenderer::draw(Renderer* renderer, const Mat4& transform, uint32_t flag
 
     for (auto&& mesh : _meshes)
     {
-        if (auto* material = dynamic_cast<StylizedMaterial*>(mesh->getMaterial()))
+        if (auto* material = mesh->getStylizedMaterial())
         {
             if (auto* stylizedRenderer = scene ? StylizedRenderer::get(*scene) : nullptr)
                 stylizedRenderer->configureMaterial(*material, _receiveShadow);

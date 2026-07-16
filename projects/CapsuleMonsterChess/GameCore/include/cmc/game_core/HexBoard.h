@@ -2,6 +2,8 @@
 
 #include "cmc/game_core/BattleTypes.h"
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -41,12 +43,42 @@ public:
     [[nodiscard]] std::int32_t getKnockbackCell(std::int32_t actorCell, std::int32_t targetCell) const;
 
 private:
-    [[nodiscard]] std::vector<std::int32_t> findPath(std::int32_t start, std::int32_t goal) const;
-    void addNeighbor(std::vector<std::int32_t>& results, std::int32_t x, std::int32_t z) const;
+    static constexpr std::size_t MAX_NEIGHBORS = 6;
+
+    struct NeighborList final
+    {
+        std::array<std::int32_t, MAX_NEIGHBORS> cells{};
+        std::size_t count = 0;
+
+        [[nodiscard]] const std::int32_t* begin() const noexcept { return cells.data(); }
+        [[nodiscard]] const std::int32_t* end() const noexcept { return cells.data() + count; }
+    };
+
+    enum class SearchState : std::uint8_t
+    {
+        Open,
+        Closed,
+    };
+
+    [[nodiscard]] NeighborList neighbors(std::int32_t index) const noexcept;
+    void addNeighbor(NeighborList& results, std::int32_t x, std::int32_t z) const noexcept;
+    void beginPathSearch() const noexcept;
+    [[nodiscard]] bool findPathFirstStep(std::int32_t start,
+                                         std::int32_t goal,
+                                         std::int32_t& firstStep,
+                                         std::size_t& pathLength) const noexcept;
 
     std::int32_t width_;
     std::int32_t height_;
-    std::vector<std::uint8_t> blocked_;
-    std::vector<std::int32_t> occupiedByUnit_;
+    std::array<std::uint8_t, static_cast<std::size_t>(MAX_BOARD_CELLS)> blocked_{};
+    std::array<std::int32_t, static_cast<std::size_t>(MAX_BOARD_CELLS)> occupiedByUnit_{};
+
+    mutable std::uint32_t searchStamp_ = 0;
+    mutable std::array<std::uint32_t, static_cast<std::size_t>(MAX_BOARD_CELLS)> cellSearchStamp_{};
+    mutable std::array<SearchState, static_cast<std::size_t>(MAX_BOARD_CELLS)> searchState_{};
+    mutable std::array<std::int32_t, static_cast<std::size_t>(MAX_BOARD_CELLS)> cameFrom_{};
+    mutable std::array<std::int32_t, static_cast<std::size_t>(MAX_BOARD_CELLS)> gScore_{};
+    mutable std::array<std::int32_t, static_cast<std::size_t>(MAX_BOARD_CELLS)> open_{};
+    mutable std::size_t openCount_ = 0;
 };
 }  // namespace cmc::game_core

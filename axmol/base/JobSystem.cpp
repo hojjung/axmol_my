@@ -32,7 +32,6 @@
 #include <mutex>
 #include <condition_variable>
 #include <functional>
-#include <stdexcept>
 
 #if defined(__EMSCRIPTEN__)
 #    include <emscripten/emscripten.h>
@@ -45,7 +44,7 @@ struct JobState
 {
     std::atomic<JobStatus> status{JobStatus::Queued};
     std::atomic_bool cancelRequested{false};
-    std::exception_ptr exception;
+    JobError error;
     mutable std::mutex mutex;
     mutable std::condition_variable condition;
 
@@ -58,10 +57,10 @@ struct JobState
         condition.notify_all();
     }
 
-    void setException(std::exception_ptr value)
+    void setError(JobError value)
     {
         std::lock_guard<std::mutex> lock(mutex);
-        exception = value;
+        error = value;
     }
 };
 
@@ -97,13 +96,13 @@ JobStatus JobHandle::status() const
     return _state ? _state->status.load(std::memory_order_acquire) : JobStatus::Canceled;
 }
 
-std::exception_ptr JobHandle::exception() const
+JobError JobHandle::error() const
 {
     if (!_state)
-        return nullptr;
+        return {};
 
     std::lock_guard<std::mutex> lock(_state->mutex);
-    return _state->exception;
+    return _state->error;
 }
 
 bool JobHandle::requestCancel() const
@@ -178,24 +177,20 @@ public:
                 return;
             state->condition.notify_all();
 
-            try
-            {
-                jobFunc(thread_data);
-                state->setStatus(state->cancelRequested.load(std::memory_order_acquire) ? JobStatus::Canceled
-                                                                                        : JobStatus::Completed);
-            }
-            catch (...)
-            {
-                state->setException(std::current_exception());
-                state->setStatus(JobStatus::Failed);
-            }
+            jobFunc(thread_data);
+            state->setStatus(state->cancelRequested.load(std::memory_order_acquire) ? JobStatus::Canceled
+                                                                                    : JobStatus::Completed);
         };
         {
             std::unique_lock<std::mutex> lock(queue_mutex);
 
             // don't allow enqueueing after stopping the pool
             if (stop)
-                throw std::runtime_error("enqueue on stopped executor");
+            {
+                state->setError({JobErrorCode::ExecutorStopped, "enqueue on stopped executor"});
+                state->setStatus(JobStatus::Failed);
+                return JobHandle(state);
+            }
 
             job_queue.emplace(std::move(wrapped_job));
         }
@@ -301,6 +296,9 @@ JobHandle JobSystem::enqueue(std::function<void()> jobFunc)
 
 JobHandle JobSystem::enqueue(std::function<void(JobThreadData*)> jobFunc)
 {
+    if (!jobFunc)
+        return {};
+
     if (_executor)
         return _executor->enqueue(std::move(jobFunc));
 
@@ -313,16 +311,8 @@ JobHandle JobSystem::enqueue(std::function<void(JobThreadData*)> jobFunc)
     }
 
     state->setStatus(JobStatus::Running);
-    try
-    {
-        jobFunc(_mainThreadData);
-        state->setStatus(JobStatus::Completed);
-    }
-    catch (...)
-    {
-        state->setException(std::current_exception());
-        state->setStatus(JobStatus::Failed);
-    }
+    jobFunc(_mainThreadData);
+    state->setStatus(JobStatus::Completed);
     return handle;
 }
 

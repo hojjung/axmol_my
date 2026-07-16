@@ -7,15 +7,14 @@
   },
   "configurePresets": [
     {
-      "name": "AX_PROFILE_STYLIZED_WEB",
+      "name": "web-release",
       "displayName": "Axmol Stylized Web (WebGL2)",
-      "description": "WebGL2 forward stylized renderer with the lightweight product profile.",
+      "description": "Axmol WebGL2 forward stylized product runtime.",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/stylized-web",
       "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "AX_PROFILE_STYLIZED_WEB": "ON",
         "AX_BUILD_TESTS": "OFF",
         "AX_RENDER_API": "gl"
       }
@@ -23,8 +22,8 @@
   ],
   "buildPresets": [
     {
-      "name": "AX_PROFILE_STYLIZED_WEB",
-      "configurePreset": "AX_PROFILE_STYLIZED_WEB",
+      "name": "web-release",
+      "configurePreset": "web-release",
       "configuration": "Release"
     }
   ]

@@ -42,29 +42,11 @@ set(CMAKE_MODULE_PATH ${_AX_ROOT}/cmake/Modules/)
 # prevent in-source-build
 include(PreventInSourceBuilds)
 
-# Product profiles must supply defaults before axmol declares its feature
-# options. Command-line -D overrides remain authoritative.
-include(${_AX_ROOT}/cmake/Profiles/AXStylizedWeb.cmake)
+# This fork has one renderer/runtime configuration.
+include(${_AX_ROOT}/cmake/Modules/AXWebRuntime.cmake)
 
 # works before build libaxmol
 include(AXBuildSet)
-
-if(AX_PROFILE_STYLIZED_WEB)
-  add_compile_definitions(FMT_OPTIMIZE_SIZE=${AX_STYLIZED_WEB_FMT_OPTIMIZE_SIZE})
-endif()
-
-if(AX_PROFILE_STYLIZED_WEB AND WASM)
-  add_link_options(
-    "$<$<CONFIG:Release>:-sENVIRONMENT=web,worker>"
-    "$<$<CONFIG:Release>:-sGL_TRACK_ERRORS=0>"
-    "$<$<CONFIG:Release>:-sGL_POOL_TEMP_BUFFERS=0>"
-    "$<$<CONFIG:Release>:-sTEXTDECODER=2>"
-  )
-
-  if(AX_STYLIZED_WEB_USE_CLOSURE)
-    add_link_options("$<$<CONFIG:Release>:--closure>" "$<$<CONFIG:Release>:1>")
-  endif()
-endif()
 
 option(AX_BUILD_TESTS "Build cpp & lua tests" ON)
 option(AX_BUILD_AXASSET "Build the host-only offline glTF asset compiler" OFF)
@@ -97,7 +79,7 @@ add_custom_target(axmol_stylized_shader_matrix
 # prevent tests project to build axmol engine again
 set(BUILD_ENGINE_DONE ON)
 
-if(AX_PROFILE_STYLIZED_WEB AND AX_BUILD_STYLIZED_SMOKE AND WASM)
+if(WASM)
   add_subdirectory(${_AX_ROOT}/tests/stylized-smoke ${CMAKE_BINARY_DIR}/tests/stylized-smoke)
 endif()
 

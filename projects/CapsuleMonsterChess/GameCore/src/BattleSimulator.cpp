@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -15,6 +16,28 @@ namespace cmc::game_core
 {
 namespace
 {
+inline constexpr std::array<StatusType, 19> ACTIVE_STATUS_TYPES = {
+    StatusType::Strength,
+    StatusType::Armor,
+    StatusType::Haste,
+    StatusType::Focus,
+    StatusType::Regeneration,
+    StatusType::Shield,
+    StatusType::Mark,
+    StatusType::Weakness,
+    StatusType::Crack,
+    StatusType::Slow,
+    StatusType::Curse,
+    StatusType::Blind,
+    StatusType::Burn,
+    StatusType::Poison,
+    StatusType::Frostbite,
+    StatusType::Stun,
+    StatusType::Silence,
+    StatusType::Taunt,
+    StatusType::Root,
+};
+
 [[nodiscard]] bool isHardCrowdControl(StatusType status) noexcept
 {
     return status == StatusType::Stun || status == StatusType::Silence || status == StatusType::Taunt ||
@@ -35,31 +58,8 @@ template <class Enum>
 
 [[nodiscard]] bool isKnownStatus(StatusType status) noexcept
 {
-    switch (status)
-    {
-    case StatusType::None:
-    case StatusType::Strength:
-    case StatusType::Armor:
-    case StatusType::Haste:
-    case StatusType::Focus:
-    case StatusType::Regeneration:
-    case StatusType::Shield:
-    case StatusType::Mark:
-    case StatusType::Weakness:
-    case StatusType::Crack:
-    case StatusType::Slow:
-    case StatusType::Curse:
-    case StatusType::Blind:
-    case StatusType::Burn:
-    case StatusType::Poison:
-    case StatusType::Frostbite:
-    case StatusType::Stun:
-    case StatusType::Silence:
-    case StatusType::Taunt:
-    case StatusType::Root:
-        return true;
-    }
-    return false;
+    return status == StatusType::None ||
+           std::find(ACTIVE_STATUS_TYPES.begin(), ACTIVE_STATUS_TYPES.end(), status) != ACTIVE_STATUS_TYPES.end();
 }
 
 [[nodiscard]] bool validStats(const UnitStats& stats) noexcept
@@ -192,6 +192,11 @@ struct StatusInstance final
     std::int32_t appliedTick    = 0;
 };
 
+inline constexpr std::size_t MAX_STATUS_INSTANCES          = ACTIVE_STATUS_TYPES.size();
+inline constexpr std::size_t DAMAGE_OVER_TIME_STATUS_COUNT = 3;
+inline constexpr std::size_t MAX_PENDING_COMMANDS =
+    static_cast<std::size_t>(MAX_BATTLE_UNITS) * DAMAGE_OVER_TIME_STATUS_COUNT + 1U;
+
 struct SimUnit final
 {
     BattleUnitSetup setup;
@@ -201,7 +206,8 @@ struct SimUnit final
     std::int32_t nextActionTick = 0;
     UnitState state             = UnitState::Idle;
     bool alive                  = true;
-    std::vector<StatusInstance> statuses;
+    std::array<StatusInstance, MAX_STATUS_INSTANCES> statuses{};
+    std::size_t statusCount     = 0;
 
     SimUnit(BattleUnitSetup value, std::int32_t cell) : setup(std::move(value)), hp(setup.stats.maxHp), cellIndex(cell)
     {}
@@ -209,8 +215,9 @@ struct SimUnit final
     [[nodiscard]] std::int32_t statusStacks(StatusType type) const noexcept
     {
         std::int32_t result = 0;
-        for (const auto& status : statuses)
+        for (std::size_t i = 0; i < statusCount; ++i)
         {
+            const auto& status = statuses[i];
             if (status.type == type)
                 result += status.stacks;
         }
@@ -221,10 +228,11 @@ struct SimUnit final
 
     [[nodiscard]] std::int32_t statusSource(StatusType type) const noexcept
     {
-        for (auto it = statuses.rbegin(); it != statuses.rend(); ++it)
+        for (auto i = statusCount; i > 0; --i)
         {
-            if (it->type == type)
-                return it->sourceUnitId;
+            const auto& status = statuses[i - 1U];
+            if (status.type == type)
+                return status.sourceUnitId;
         }
         return 0;
     }
@@ -235,8 +243,9 @@ struct SimUnit final
                    std::int32_t sourceUnitId,
                    std::int32_t appliedTick)
     {
-        for (auto& status : statuses)
+        for (std::size_t i = 0; i < statusCount; ++i)
         {
+            auto& status = statuses[i];
             if (status.type != type)
                 continue;
             status.stacks += stacksToAdd;
@@ -251,13 +260,14 @@ struct SimUnit final
         auto clampedStacks = stacksToAdd;
         if (!isHardCrowdControl(type))
             clampedStacks = std::min(clampedStacks, 99);
-        statuses.push_back({type, clampedStacks, durationTicks, sourceUnitId, appliedTick});
+        assert(statusCount < statuses.size());
+        statuses[statusCount++] = {type, clampedStacks, durationTicks, sourceUnitId, appliedTick};
     }
 
     void removeStatusStacks(StatusType type, std::int32_t stacksToRemove)
     {
         auto remaining = stacksToRemove;
-        for (std::size_t i = statuses.size(); i > 0U && remaining > 0; --i)
+        for (std::size_t i = statusCount; i > 0U && remaining > 0; --i)
         {
             auto& status = statuses[i - 1U];
             if (status.type != type)
@@ -266,8 +276,16 @@ struct SimUnit final
             status.stacks -= removed;
             remaining -= removed;
             if (status.stacks <= 0)
-                statuses.erase(statuses.begin() + static_cast<std::ptrdiff_t>(i - 1U));
+                eraseStatus(i - 1U);
         }
+    }
+
+    void eraseStatus(std::size_t index) noexcept
+    {
+        assert(index < statusCount);
+        for (auto i = index + 1U; i < statusCount; ++i)
+            statuses[i - 1U] = statuses[i];
+        --statusCount;
     }
 };
 
@@ -279,8 +297,6 @@ enum class CommandType : std::uint8_t
 
 struct ScheduledCommand final
 {
-    std::int32_t tick          = 0;
-    std::uint64_t order        = 0;
     CommandType type           = CommandType::Damage;
     std::int32_t sourceId      = 0;
     std::int32_t targetId      = 0;
@@ -299,6 +315,7 @@ public:
         : request_(std::move(request)), board_(request_.board), random_(request_.seed)
     {
         result_.battleId = request_.battleId;
+        units_.reserve(static_cast<std::size_t>(MAX_BATTLE_UNITS));
         spawnUnits();
     }
 
@@ -348,15 +365,13 @@ private:
                         bool basicAttack)
     {
         ScheduledCommand command;
-        command.tick        = currentTick_;
-        command.order       = nextCommandOrder_++;
         command.type        = CommandType::Damage;
         command.sourceId    = sourceId;
         command.targetId    = targetId;
         command.amount      = amount;
         command.damageType  = damageType;
         command.basicAttack = basicAttack;
-        commands_.push_back(command);
+        enqueueCommand(command);
     }
 
     void scheduleStatus(std::int32_t sourceId,
@@ -366,35 +381,30 @@ private:
                         std::int32_t durationTicks)
     {
         ScheduledCommand command;
-        command.tick          = currentTick_;
-        command.order         = nextCommandOrder_++;
         command.type          = CommandType::Status;
         command.sourceId      = sourceId;
         command.targetId      = targetId;
         command.status        = status;
         command.stacks        = stacks;
         command.durationTicks = durationTicks;
-        commands_.push_back(command);
+        enqueueCommand(command);
+    }
+
+    void enqueueCommand(const ScheduledCommand& command) noexcept
+    {
+        assert(commandCount_ < commands_.size());
+        const auto tail = (commandHead_ + commandCount_) % commands_.size();
+        commands_[tail] = command;
+        ++commandCount_;
     }
 
     void executeDueCommands()
     {
-        while (true)
+        while (commandCount_ != 0)
         {
-            auto best = commands_.end();
-            for (auto it = commands_.begin(); it != commands_.end(); ++it)
-            {
-                if (it->tick > currentTick_)
-                    continue;
-                if (best == commands_.end() || it->tick < best->tick ||
-                    (it->tick == best->tick && it->order < best->order))
-                    best = it;
-            }
-            if (best == commands_.end())
-                return;
-
-            const auto command = *best;
-            commands_.erase(best);
+            const auto command = commands_[commandHead_];
+            commandHead_       = (commandHead_ + 1U) % commands_.size();
+            --commandCount_;
             if (command.type == CommandType::Damage)
                 applyDamage(command.sourceId, command.targetId, command.amount, command.damageType,
                             command.basicAttack);
@@ -521,9 +531,9 @@ private:
         {
             const auto rule = effect.targetRule == TargetRule::CurrentTarget ? skill.targetRule : effect.targetRule;
             collectTargets(caster, currentTarget, rule, effect.radius);
-            const auto targets = targetBuffer_;
-            for (const auto targetId : targets)
+            for (std::size_t i = 0; i < targetCount_; ++i)
             {
+                const auto targetId = targetBuffer_[i];
                 auto* target = unit(targetId);
                 if (target && target->alive)
                     applyEffect(caster, *target, effect);
@@ -566,7 +576,7 @@ private:
         {
             if (!current.alive)
                 continue;
-            for (std::size_t i = current.statuses.size(); i > 0U; --i)
+            for (std::size_t i = current.statusCount; i > 0U; --i)
             {
                 auto status = current.statuses[i - 1U];
                 if (isDamageOverTime(status.type) && currentTick_ > status.appliedTick &&
@@ -580,7 +590,7 @@ private:
                 --status.remainingTicks;
                 if (status.remainingTicks <= 0)
                 {
-                    current.statuses.erase(current.statuses.begin() + static_cast<std::ptrdiff_t>(i - 1U));
+                    current.eraseStatus(i - 1U);
                     addEvent(BattleEventType::StatusExpired, status.sourceUnitId, current.setup.unitId,
                              current.setup.teamId, current.cellIndex, current.cellIndex, 0, 0, status.type, 0, 0);
                 }
@@ -757,7 +767,7 @@ private:
 
     void collectTargets(SimUnit& caster, SimUnit& currentTarget, TargetRule rule, std::int32_t radius)
     {
-        targetBuffer_.clear();
+        targetCount_ = 0;
         if (rule == TargetRule::AllEnemies || rule == TargetRule::AllAllies)
         {
             for (const auto& candidate : units_)
@@ -766,7 +776,7 @@ private:
                     continue;
                 const bool ally = candidate.setup.teamId == caster.setup.teamId;
                 if ((rule == TargetRule::AllEnemies && !ally) || (rule == TargetRule::AllAllies && ally))
-                    targetBuffer_.push_back(candidate.setup.unitId);
+                    targetBuffer_[targetCount_++] = candidate.setup.unitId;
             }
             return;
         }
@@ -781,7 +791,7 @@ private:
         if (!primary)
             return;
 
-        targetBuffer_.push_back(primary->setup.unitId);
+        targetBuffer_[targetCount_++] = primary->setup.unitId;
         if (radius <= 0)
             return;
         for (const auto& candidate : units_)
@@ -790,7 +800,7 @@ private:
                 candidate.setup.teamId != primary->setup.teamId)
                 continue;
             if (board_.distance(primary->cellIndex, candidate.cellIndex) <= radius)
-                targetBuffer_.push_back(candidate.setup.unitId);
+                targetBuffer_[targetCount_++] = candidate.setup.unitId;
         }
     }
 
@@ -813,16 +823,25 @@ private:
 
     [[nodiscard]] SimUnit* selectRandomEnemy(const SimUnit& actor)
     {
-        std::vector<SimUnit*> enemies;
-        enemies.reserve(units_.size());
-        for (auto& candidate : units_)
+        std::int32_t enemyCount = 0;
+        for (const auto& candidate : units_)
         {
             if (candidate.alive && candidate.setup.teamId != actor.setup.teamId)
-                enemies.push_back(&candidate);
+                ++enemyCount;
         }
-        if (enemies.empty())
+        if (enemyCount == 0)
             return nullptr;
-        return enemies[static_cast<std::size_t>(random_.nextInt(0, static_cast<std::int32_t>(enemies.size())))];
+
+        auto selected = random_.nextInt(0, enemyCount);
+        for (auto& candidate : units_)
+        {
+            if (!candidate.alive || candidate.setup.teamId == actor.setup.teamId)
+                continue;
+            if (selected == 0)
+                return &candidate;
+            --selected;
+        }
+        return nullptr;
     }
 
     [[nodiscard]] static std::int32_t applySpeed(const SimUnit& actor, std::int32_t baseInterval) noexcept
@@ -953,10 +972,12 @@ private:
     HexBoard board_;
     DeterministicRandom random_;
     std::vector<SimUnit> units_;
-    std::vector<ScheduledCommand> commands_;
-    std::vector<std::int32_t> targetBuffer_;
-    std::uint64_t nextCommandOrder_ = 0;
-    std::int32_t currentTick_       = 0;
+    std::array<ScheduledCommand, MAX_PENDING_COMMANDS> commands_{};
+    std::array<std::int32_t, static_cast<std::size_t>(MAX_BATTLE_UNITS)> targetBuffer_{};
+    std::size_t commandHead_  = 0;
+    std::size_t commandCount_ = 0;
+    std::size_t targetCount_  = 0;
+    std::int32_t currentTick_ = 0;
 };
 
 [[nodiscard]] StatusType elementStatus(ElementType element) noexcept

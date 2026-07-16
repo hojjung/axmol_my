@@ -154,22 +154,22 @@ build/axasset/tools/axasset/axasset \
 
 FBX와 PSD, Unity JMO/AC 셰이더 원본은 라이선스 자산이므로 저장소나 CI fixture에 넣지 않는다.
 
-## WebGL2 경량 프로필
+## WebGL2 제품 런타임
 
 ```bash
 export EMSDK=/absolute/path/to/emsdk
-cmake --preset AX_PROFILE_STYLIZED_WEB
-cmake --build --preset AX_PROFILE_STYLIZED_WEB
+cmake --preset web-release
+cmake --build --preset web-release
 cmake --build build/stylized-web --target axmol_stylized_web_size_gate
 ```
 
-프로필은 2D/UI, audio, skeletal animation, 기본 particle와 PNG/KTX2 자산 경로를 유지한다. 선택적 Opus codec, Physics2D/3D, NavMesh, media, Lua, editor/inspection, BMP/JPEG/WebP, 레거시 3D/이미지 로더 및 미사용 extension은 기본 OFF다. 기능은 삭제되지 않으며 Opus는 `-DAX_ENABLE_OPUS=ON`, Physics2D는 `-DAX_ENABLE_PHYSICS_2D=ON`, 레거시 로더는 `-DAX_ENABLE_LEGACY_3D=ON -DAX_ENABLE_LEGACY_IMAGE_FORMATS=ON`처럼 명시적으로 다시 켤 수 있다. BMP는 `-DAX_USE_BMP=ON`, JPEG는 `-DAX_USE_JPEG=ON -DAX_WITH_JPEG=ON`, WebP는 `-DAX_USE_WEBP=ON -DAX_WITH_WEBP=ON`으로 decoder와 필요한 link target을 함께 다시 켠다.
+제품 런타임은 2D/UI, audio, skeletal animation, 기본 particle와 PNG/KTX2 자산 경로를 유지한다. Opus codec, Physics2D/3D, NavMesh, media, Lua, editor/inspection, BMP/JPEG/WebP, 레거시 3D/이미지 로더 및 미사용 extension은 지원 빌드에서 제외한다. 이 구성은 선택 프로필이 아니라 Axmol 포크의 단일 엔진 구성이다.
 
-`axmol_stylized_web_size_gate`는 pristine `upstream/dev@c61ed1cb3` 최소 WebGL2 샘플의 WASM+JS Brotli q11 합계 `B=552,902 bytes`와 같은 조건으로 비교한다. 기준을 다시 측정한 경우에만 `AX_STYLIZED_WEB_BASELINE_BROTLI_BYTES`를 명시적으로 갱신한다.
+`axmol_stylized_web_size_gate`는 pristine `upstream/dev@c61ed1cb3` 최소 WebGL2 샘플의 WASM+JS Brotli q11 합계 `B=552,902 bytes`와 같은 조건으로 비교한다. 기준을 다시 측정한 경우에만 `AX_WEB_BASELINE_BROTLI_BYTES`를 갱신한다.
 
-Web profile은 fmt v12의 `FMT_OPTIMIZE_SIZE=2`를 전체 target에 동일하게 적용한다. 이는 locale-aware formatting과 큰 정수/부동소수 formatting의 size 우선 경로를 선택하며, 프레임 렌더러에는 문자열 formatting을 두지 않는다. locale formatting이 필요한 제품은 `-DAX_STYLIZED_WEB_FMT_OPTIMIZE_SIZE=0`으로 명시적으로 되돌린 뒤 크기 게이트를 다시 측정한다.
+Web runtime은 fmt v12의 `FMT_OPTIMIZE_SIZE=2`를 전체 target에 동일하게 적용한다. 이는 locale-aware formatting과 큰 정수/부동소수 formatting의 size 우선 경로를 선택하며, 프레임 렌더러에는 문자열 formatting을 두지 않는다.
 
-Release Web profile은 Emscripten launcher JavaScript를 Closure Compiler로 minify한다. 툴체인 회귀를 분리 진단할 때만 `-DAX_STYLIZED_WEB_USE_CLOSURE=OFF`로 끄고, 출하 크기 게이트는 Closure를 켠 fresh build에서 다시 측정한다. PNG/XML parser와 glTF/meshopt/Basis transcoder처럼 프레임 밖의 자산 로드 경로만 `-Oz`로 컴파일하며, renderer와 animation update는 `-O3`를 유지한다.
+Release Web runtime은 Emscripten launcher JavaScript를 Closure Compiler로 minify한다. PNG/XML parser와 glTF/meshopt/Basis transcoder처럼 프레임 밖의 자산 로드 경로만 `-Oz`로 컴파일하며, renderer와 animation update는 `-O3`를 유지한다.
 
 WebGL2 profile은 Emscripten의 정적 GLES3 prototype을 사용한다. native GL/GLES의 GLAD 경로는 유지하지만 Web 산출물에는 GLAD runtime symbol loader와 `GL_ENABLE_GET_PROC_ADDRESS`를 넣지 않는다. Release에서는 Node/shell 호스트 분기, GLES-WebGL error tracking과 WebGL1 uniform 임시 버퍼도 제외하고 WebGL2 지원 브라우저의 `TextDecoder`를 직접 사용한다.
 
@@ -182,16 +182,7 @@ Cross-Origin-Embedder-Policy: require-corp
 
 `Cross-Origin-Embedder-Policy: credentialless`도 배포 정책이 허용하는 경우 사용할 수 있다. CDN, iframe, font/audio/image 등 하위 resource는 COEP에 맞는 same-origin, CORP 또는 CORS 응답이어야 한다. 자세한 제약은 [Emscripten pthread 문서](https://emscripten.org/docs/porting/pthreads.html)를 기준으로 한다.
 
-COOP/COEP를 보장할 수 없는 호스팅에는 별도의 single-thread 산출물을 fresh configure한다. pthread와 non-pthread를 한 binary에서 runtime 전환하거나 실패 후 reload하지 않는다.
-
-```bash
-cmake -S . -B build/stylized-web-single \
-  -DCMAKE_TOOLCHAIN_FILE="$EMSDK/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DAX_PROFILE_STYLIZED_WEB=ON \
-  -DAX_WASM_THREADS=0
-cmake --build build/stylized-web-single --target stylized-smoke
-```
+COOP/COEP를 보장하지 못하는 호스팅은 지원 대상이 아니다. pthread와 non-pthread 대체 바이너리를 함께 유지하지 않는다.
 
 WebGL context loss 중에는 frame 제출을 중단한다. lost context의 native handle은 새 context에서 bind/delete하지 않고 폐기한다. restore event에서는 지원 extension을 먼저 다시 활성화하고 capability/compressed-format 목록을 갱신한 뒤 shared VAO, RHI resource, shadow target, stylized scaled target/pipeline, retained texture와 dynamic DrawNode buffer를 재생성한다. Scene에서 잠시 분리된 pooled DrawNode도 fixed listener로 CPU geometry를 dirty 처리해 재부착 후 업로드한다. Program relink는 WASM에서만 generic Buffer 복구보다 먼저 실행해 old UBO listener를 제거하며, native GL의 기존 복구 순서는 실기기 lifecycle gate 없이 바꾸지 않는다. Shadow sampler binding은 old texture를 명시적으로 clear한 뒤 새 atlas가 준비된 다음 frame에 다시 설치한다. KTX2 texture는 compact encoded source를 보관하고 restore 순간에만 임시 decode하여 GPU upload 뒤 해제한다.
 

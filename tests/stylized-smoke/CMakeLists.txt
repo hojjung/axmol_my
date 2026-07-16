@@ -62,7 +62,7 @@ set_target_properties(${APP_NAME} PROPERTIES FOLDER "Apps")
 add_custom_target(axmol_stylized_web_size_gate
   COMMAND ${CMAKE_COMMAND}
     -DAX_STYLIZED_WEB_HTML=$<TARGET_FILE:${APP_NAME}>
-    -DAX_STYLIZED_WEB_BASELINE_BROTLI_BYTES=${AX_STYLIZED_WEB_BASELINE_BROTLI_BYTES}
+    -DAX_WEB_BASELINE_BROTLI_BYTES=${AX_WEB_BASELINE_BROTLI_BYTES}
     -P ${_AX_ROOT}/cmake/Profiles/VerifyStylizedWebSize.cmake
   DEPENDS ${APP_NAME}
   COMMENT "Checking stylized WebGL2 WASM+JS Brotli size against the pristine baseline"

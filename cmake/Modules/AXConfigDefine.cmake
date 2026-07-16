@@ -202,6 +202,8 @@ if(APPLE)
   )
 endif()
 
+add_compile_definitions(FMT_OPTIMIZE_SIZE=2)
+
 if(EMSCRIPTEN)
   if(NOT DEFINED AX_USE_JPEG OR AX_USE_JPEG)
     # Tell emcc to build the libjpeg port (not in the default sysroot).
@@ -213,6 +215,14 @@ if(EMSCRIPTEN)
 
   list(APPEND _ax_compile_opts "-fwasm-exceptions")
   list(APPEND _ax_link_opts "-fwasm-exceptions")
+  list(APPEND _ax_link_opts
+    "$<$<CONFIG:Release>:-sENVIRONMENT=web,worker>"
+    "$<$<CONFIG:Release>:-sGL_TRACK_ERRORS=0>"
+    "$<$<CONFIG:Release>:-sGL_POOL_TEMP_BUFFERS=0>"
+    "$<$<CONFIG:Release>:-sTEXTDECODER=2>"
+    "$<$<CONFIG:Release>:--closure>"
+    "$<$<CONFIG:Release>:1>"
+  )
 
   # list(APPEND _ax_link_opts "-sASSERTIONS=1")
 

@@ -199,7 +199,7 @@ bounds tests, the shader/runtime link, and the Web Brotli size gate.
 
 ### 3.6 Web size became an enforceable gate
 
-`AX_PROFILE_STYLIZED_WEB` keeps 2D/UI, audio, skeletal animation, basic
+The Axmol Web runtime keeps 2D/UI, audio, skeletal animation, basic
 particles, PNG, glTF, meshopt, and Basis/KTX2. Physics3D, NavMesh, media, Lua,
 editor/inspection, unused extensions, legacy 3D/image loaders, and unused
 shaders default to off without deleting their source.
@@ -226,7 +226,7 @@ no Dragon/FBX/PSD/manual-content path or name. The manual Dragon validation
 build is deliberately not the product size artifact because its loader and DOM
 instrumentation raise the total to `562,168 bytes`.
 
-Do not update `AX_STYLIZED_WEB_BASELINE_BROTLI_BYTES` merely to make a failing
+Do not update `AX_WEB_BASELINE_BROTLI_BYTES` merely to make a failing
 change pass. Re-measure the pristine base with the same compiler and compression
 commands first.
 
@@ -366,7 +366,7 @@ with Brotli q11, including the ignored 266,116-byte local Dragon GLB.
 ### Web profile and smoke application
 
 - `CMakePresets.json`
-- `cmake/Profiles/AXStylizedWeb.cmake`
+- `cmake/Modules/AXWebRuntime.cmake`
 - `cmake/Profiles/VerifyStylizedShaders.cmake`
 - `cmake/Profiles/VerifyStylizedWebSize.cmake`
 - `axmol/platform/wasm/runtime_pre.js`
@@ -655,8 +655,8 @@ cmake --build build/axasset \
 
 ```bash
 export EMSDK=/absolute/path/to/emsdk
-cmake --preset AX_PROFILE_STYLIZED_WEB
-cmake --build --preset AX_PROFILE_STYLIZED_WEB
+cmake --preset web-release
+cmake --build --preset web-release
 cmake --build build/stylized-web --target axmol_stylized_web_size_gate
 ```
 

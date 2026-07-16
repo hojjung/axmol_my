@@ -52,6 +52,7 @@ class Pass;
 class Node;
 class Properties;
 class RenderState;
+class StylizedMaterial;
 
 namespace rhi
 {
@@ -70,6 +71,10 @@ class AX_DLL Material : public Object
     friend class RenderState;
 
 public:
+    /** Direct product material contract. Non-stylized materials return nullptr. */
+    virtual StylizedMaterial* asStylizedMaterial() noexcept { return nullptr; }
+    virtual const StylizedMaterial* asStylizedMaterial() const noexcept { return nullptr; }
+
     /**
      * Creates a Material using the data from the Properties object defined at the specified URL,
      * where the URL is of the format "<file-path>.<extension>#<namespace-id>/<namespace-id>/.../<namespace-id>"

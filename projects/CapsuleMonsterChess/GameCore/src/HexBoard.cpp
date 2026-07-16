@@ -1,6 +1,5 @@
 #include "cmc/game_core/HexBoard.h"
 
-#include <algorithm>
 #include <cstdlib>
 #include <limits>
 
@@ -25,9 +24,7 @@ HexBoard::HexBoard(std::int32_t width, std::int32_t height, const std::vector<st
         height_ = DEFAULT_BOARD_HEIGHT;
     }
 
-    const auto count = static_cast<std::size_t>(width_) * static_cast<std::size_t>(height_);
-    blocked_.assign(count, 0U);
-    occupiedByUnit_.assign(count, -1);
+    occupiedByUnit_.fill(-1);
     for (const auto cell : blockedCells)
     {
         if (isValidIndex(cell))
@@ -114,18 +111,11 @@ std::int32_t HexBoard::distance(std::int32_t a, std::int32_t b) const noexcept
 void HexBoard::getNeighbors(std::int32_t index, std::vector<std::int32_t>& results) const
 {
     results.clear();
-    if (!isValidIndex(index))
+    const auto list = neighbors(index);
+    if (list.count == 0)
         return;
-
-    results.reserve(6);
-    const auto [x, z] = toCoord(index);
-    const bool odd    = (z & 1) == 1;
-    addNeighbor(results, x + 1, z);
-    addNeighbor(results, x - 1, z);
-    addNeighbor(results, x + (odd ? 1 : 0), z + 1);
-    addNeighbor(results, x + (odd ? 0 : -1), z + 1);
-    addNeighbor(results, x + (odd ? 1 : 0), z - 1);
-    addNeighbor(results, x + (odd ? 0 : -1), z - 1);
+    results.reserve(MAX_NEIGHBORS);
+    results.insert(results.end(), list.begin(), list.end());
 }
 
 bool HexBoard::tryFindNextStep(std::int32_t from,
@@ -144,41 +134,37 @@ bool HexBoard::tryFindNextStep(std::int32_t from,
     if (targetDistance <= range)
         return true;
 
-    std::vector<std::int32_t> candidates;
-    std::vector<std::int32_t> neighbors;
-    candidates.reserve(6);
-    getNeighbors(target, neighbors);
-    for (const auto cell : neighbors)
+    NeighborList candidates;
+    for (const auto cell : neighbors(target))
     {
         if (distance(cell, target) <= range && (canStand(cell) || cell == from))
-            candidates.push_back(cell);
+            candidates.cells[candidates.count++] = cell;
     }
 
     std::size_t bestLength = std::numeric_limits<std::size_t>::max();
-    std::vector<std::int32_t> bestPath;
+    std::int32_t bestStep   = -1;
     for (const auto candidate : candidates)
     {
-        auto path = findPath(from, candidate);
-        if (path.size() > 1U && path.size() < bestLength)
+        std::int32_t firstStep = -1;
+        std::size_t pathLength = 0;
+        if (findPathFirstStep(from, candidate, firstStep, pathLength) && pathLength > 1U && pathLength < bestLength)
         {
-            bestLength = path.size();
-            bestPath   = std::move(path);
+            bestLength = pathLength;
+            bestStep   = firstStep;
         }
     }
 
-    if (bestPath.empty())
+    if (bestStep < 0)
         return false;
-    nextStep = bestPath[1];
+    nextStep = bestStep;
     return true;
 }
 
 std::int32_t HexBoard::getBestEmptyNeighborNear(std::int32_t target, std::int32_t from) const
 {
-    std::vector<std::int32_t> neighbors;
-    getNeighbors(target, neighbors);
     std::int32_t best         = -1;
     std::int32_t bestDistance = std::numeric_limits<std::int32_t>::max();
-    for (const auto cell : neighbors)
+    for (const auto cell : neighbors(target))
     {
         if (!canStand(cell))
             continue;
@@ -194,11 +180,9 @@ std::int32_t HexBoard::getBestEmptyNeighborNear(std::int32_t target, std::int32_
 
 std::int32_t HexBoard::getKnockbackCell(std::int32_t actorCell, std::int32_t targetCell) const
 {
-    std::vector<std::int32_t> neighbors;
-    getNeighbors(targetCell, neighbors);
     std::int32_t best         = -1;
     std::int32_t bestDistance = distance(actorCell, targetCell);
-    for (const auto cell : neighbors)
+    for (const auto cell : neighbors(targetCell))
     {
         if (!canStand(cell))
             continue;
@@ -212,31 +196,66 @@ std::int32_t HexBoard::getKnockbackCell(std::int32_t actorCell, std::int32_t tar
     return best;
 }
 
-std::vector<std::int32_t> HexBoard::findPath(std::int32_t start, std::int32_t goal) const
+HexBoard::NeighborList HexBoard::neighbors(std::int32_t index) const noexcept
 {
+    NeighborList results;
+    if (!isValidIndex(index))
+        return results;
+
+    const auto [x, z] = toCoord(index);
+    const bool odd    = (z & 1) == 1;
+    addNeighbor(results, x + 1, z);
+    addNeighbor(results, x - 1, z);
+    addNeighbor(results, x + (odd ? 1 : 0), z + 1);
+    addNeighbor(results, x + (odd ? 0 : -1), z + 1);
+    addNeighbor(results, x + (odd ? 1 : 0), z - 1);
+    addNeighbor(results, x + (odd ? 0 : -1), z - 1);
+    return results;
+}
+
+void HexBoard::beginPathSearch() const noexcept
+{
+    ++searchStamp_;
+    if (searchStamp_ == 0)
+    {
+        cellSearchStamp_.fill(0);
+        searchStamp_ = 1;
+    }
+    openCount_ = 0;
+}
+
+bool HexBoard::findPathFirstStep(std::int32_t start,
+                                 std::int32_t goal,
+                                 std::int32_t& firstStep,
+                                 std::size_t& pathLength) const noexcept
+{
+    firstStep  = -1;
+    pathLength = 0;
     if (!isValidIndex(start) || !isValidIndex(goal))
-        return {};
+        return false;
     if (start == goal)
-        return {start};
+    {
+        pathLength = 1;
+        return true;
+    }
 
-    const auto count = static_cast<std::size_t>(cellCount());
-    std::vector<std::uint8_t> closed(count, 0U);
-    std::vector<std::int32_t> cameFrom(count, -1);
-    std::vector<std::int32_t> gScore(count, std::numeric_limits<std::int32_t>::max());
-    std::vector<std::int32_t> open{start};
-    std::vector<std::int32_t> neighbors;
-    open.reserve(count);
-    gScore[static_cast<std::size_t>(start)] = 0;
+    beginPathSearch();
+    const auto startIndex          = static_cast<std::size_t>(start);
+    cellSearchStamp_[startIndex]   = searchStamp_;
+    searchState_[startIndex]       = SearchState::Open;
+    cameFrom_[startIndex]          = -1;
+    gScore_[startIndex]            = 0;
+    open_[openCount_++]            = start;
 
-    while (!open.empty())
+    while (openCount_ != 0)
     {
         std::size_t currentPosition = 0U;
-        auto current                = open[0];
-        auto currentF               = gScore[static_cast<std::size_t>(current)] + distance(current, goal);
-        for (std::size_t i = 1U; i < open.size(); ++i)
+        auto current                = open_[0];
+        auto currentF               = gScore_[static_cast<std::size_t>(current)] + distance(current, goal);
+        for (std::size_t i = 1U; i < openCount_; ++i)
         {
-            const auto candidate = open[i];
-            const auto f         = gScore[static_cast<std::size_t>(candidate)] + distance(candidate, goal);
+            const auto candidate = open_[i];
+            const auto f         = gScore_[static_cast<std::size_t>(candidate)] + distance(candidate, goal);
             if (f < currentF || (f == currentF && candidate < current))
             {
                 currentPosition = i;
@@ -245,44 +264,57 @@ std::vector<std::int32_t> HexBoard::findPath(std::int32_t start, std::int32_t go
             }
         }
 
-        open.erase(open.begin() + static_cast<std::ptrdiff_t>(currentPosition));
+        for (auto i = currentPosition + 1U; i < openCount_; ++i)
+            open_[i - 1U] = open_[i];
+        --openCount_;
+
         if (current == goal)
         {
-            std::vector<std::int32_t> path{current};
-            while (cameFrom[static_cast<std::size_t>(current)] >= 0)
+            pathLength = 1;
+            auto cursor = goal;
+            while (cursor != start)
             {
-                current = cameFrom[static_cast<std::size_t>(current)];
-                path.push_back(current);
+                const auto parent = cameFrom_[static_cast<std::size_t>(cursor)];
+                if (parent < 0)
+                    return false;
+                ++pathLength;
+                if (parent == start)
+                    firstStep = cursor;
+                cursor = parent;
             }
-            std::reverse(path.begin(), path.end());
-            return path;
+            return true;
         }
 
-        closed[static_cast<std::size_t>(current)] = 1U;
-        getNeighbors(current, neighbors);
-        for (const auto next : neighbors)
+        searchState_[static_cast<std::size_t>(current)] = SearchState::Closed;
+        for (const auto next : neighbors(current))
         {
             const auto nextIndex = static_cast<std::size_t>(next);
-            if (closed[nextIndex] != 0U || isBlocked(next) || (isOccupied(next) && next != goal))
+            const bool seen      = cellSearchStamp_[nextIndex] == searchStamp_;
+            if ((seen && searchState_[nextIndex] == SearchState::Closed) || isBlocked(next) ||
+                (isOccupied(next) && next != goal))
                 continue;
 
-            const auto tentative = gScore[static_cast<std::size_t>(current)] + 1;
-            if (tentative >= gScore[nextIndex])
+            const auto tentative = gScore_[static_cast<std::size_t>(current)] + 1;
+            if (seen && tentative >= gScore_[nextIndex])
                 continue;
 
-            cameFrom[nextIndex] = current;
-            gScore[nextIndex]   = tentative;
-            if (std::find(open.begin(), open.end(), next) == open.end())
-                open.push_back(next);
+            cameFrom_[nextIndex] = current;
+            gScore_[nextIndex]   = tentative;
+            if (!seen)
+            {
+                cellSearchStamp_[nextIndex] = searchStamp_;
+                searchState_[nextIndex]     = SearchState::Open;
+                open_[openCount_++]          = next;
+            }
         }
     }
-    return {};
+    return false;
 }
 
-void HexBoard::addNeighbor(std::vector<std::int32_t>& results, std::int32_t x, std::int32_t z) const
+void HexBoard::addNeighbor(NeighborList& results, std::int32_t x, std::int32_t z) const noexcept
 {
     const auto index = toIndex(x, z);
     if (index >= 0)
-        results.push_back(index);
+        results.cells[results.count++] = index;
 }
 }  // namespace cmc::game_core

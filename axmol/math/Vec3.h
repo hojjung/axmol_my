@@ -23,6 +23,7 @@
 #pragma once
 
 #include <cmath>
+
 #include "axmol/base/Macros.h"
 #include "axmol/math/MathBase.h"
 
@@ -250,7 +251,7 @@ public:
      *
      * @see length
      */
-    float lengthSquared() const { return (x * x + y * y + z * z); }
+    float lengthSquared() const { return x * x + y * y + z * z; }
 
     /**
      * Negates this vector.
@@ -387,7 +388,7 @@ public:
      * Linear interpolation between two vectors A and B by alpha which
      * is in the range [0,1]
      */
-    Vec3 lerp(const Vec3& target, float alpha) const { return *this * (1.f - alpha) + target * alpha; }
+    Vec3 lerp(const Vec3& target, float alpha) const { return *this * (1.0f - alpha) + target * alpha; }
 
     /**
      * Calculates the sum of this vector with the given vector.
@@ -492,7 +493,7 @@ public:
      * @param s the constant to divide this vector with
      * @return a smaller vector
      */
-    Vec3 operator/(float s) const { return Vec3(this->x / s, this->y / s, this->z / s); }
+    Vec3 operator/(float s) const { return {x / s, y / s, z / s}; }
 
     /** Returns true if the vector's scalar components are all greater
      that the ones of the vector it is compared against.

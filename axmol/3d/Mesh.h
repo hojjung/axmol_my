@@ -224,6 +224,10 @@ public:
     /** Returns the Material being used by the Mesh */
     Material* getMaterial() const;
 
+    /** Returns the cached stylized material contract, or nullptr for other materials. */
+    StylizedMaterial* getStylizedMaterial() noexcept { return _stylizedMaterial; }
+    const StylizedMaterial* getStylizedMaterial() const noexcept { return _stylizedMaterial; }
+
     void draw(Renderer* renderer,
               float globalZ,
               const Mat4& transform,
@@ -321,6 +325,7 @@ protected:
     BlendFunc _blend;
     bool _blendDirty;
     Material* _material;
+    StylizedMaterial* _stylizedMaterial;
     AABB _aabb;
     std::function<void()> _visibleChanged;
     tlx::string_map<std::vector<MeshCommand>> _meshCommands;

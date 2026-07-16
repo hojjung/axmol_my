@@ -72,7 +72,6 @@ source ../../tools/external/emsdk/emsdk_env.sh
 
 AX_ROOT=/Users/ethanjung/Desktop/Dev/Cpp/axmol_my \
   ../../tools/cmdline/axmol build -p wasm -f \
-  -xc '-DAX_PROFILE_STYLIZED_WEB=ON' \
   -xb '--config','Release'
 ```
 

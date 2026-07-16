@@ -15,6 +15,8 @@ set(CMAKE_DEBUG_TARGET_PROPERTIES
 cmake_policy(SET CMP0072 NEW)
 
 # some useful variables for every one ax project
+include(AXWebRuntime)
+
 set(ENGINE_BINARY_PATH ${PROJECT_BINARY_DIR}/engine)
 
 if(CMAKE_TOOLCHAIN_FILE)

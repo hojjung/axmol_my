@@ -21,8 +21,10 @@
  */
 
 #include "axmol/math/Vec3.h"
-#include "axmol/math/MathUtil.h"
 #include "axmol/base/Macros.h"
+
+#include <Magnum/Math/Functions.h>
+#include <Magnum/Math/Vector3.h>
 
 NS_AX_MATH_BEGIN
 
@@ -36,11 +38,9 @@ const Vec3 Vec3::zAxis(0.0f, 0.0f, 1.0f);
 
 float Vec3::angle(const Vec3& v1, const Vec3& v2)
 {
-    float dx = v1.y * v2.z - v1.z * v2.y;
-    float dy = v1.z * v2.x - v1.x * v2.z;
-    float dz = v1.x * v2.y - v1.y * v2.x;
-
-    return std::atan2(std::sqrt(dx * dx + dy * dy + dz * dz) + MATH_FLOAT_SMALL, dot(v1, v2));
+    const Magnum::Vector3 a{v1.x, v1.y, v1.z};
+    const Magnum::Vector3 b{v2.x, v2.y, v2.z};
+    return std::atan2(Magnum::Math::cross(a, b).length() + MATH_FLOAT_SMALL, Magnum::Math::dot(a, b));
 }
 
 void Vec3::add(const Vec3& v1, const Vec3& v2, Vec3* dst)
@@ -56,23 +56,11 @@ void Vec3::clamp(const Vec3& min, const Vec3& max)
 {
     AX_ASSERT(!(min.x > max.x || min.y > max.y || min.z > max.z));
 
-    // Clamp the x value.
-    if (x < min.x)
-        x = min.x;
-    if (x > max.x)
-        x = max.x;
-
-    // Clamp the y value.
-    if (y < min.y)
-        y = min.y;
-    if (y > max.y)
-        y = max.y;
-
-    // Clamp the z value.
-    if (z < min.z)
-        z = min.z;
-    if (z > max.z)
-        z = max.z;
+    const Magnum::Vector3 result = Magnum::Math::clamp(Magnum::Vector3{x, y, z}, Magnum::Vector3{min.x, min.y, min.z},
+                                                       Magnum::Vector3{max.x, max.y, max.z});
+    x                            = result.x();
+    y                            = result.y();
+    z                            = result.z();
 }
 
 void Vec3::clamp(const Vec3& v, const Vec3& min, const Vec3& max, Vec3* dst)
@@ -80,26 +68,11 @@ void Vec3::clamp(const Vec3& v, const Vec3& min, const Vec3& max, Vec3* dst)
     AX_ASSERT(dst);
     AX_ASSERT(!(min.x > max.x || min.y > max.y || min.z > max.z));
 
-    // Clamp the x value.
-    dst->x = v.x;
-    if (dst->x < min.x)
-        dst->x = min.x;
-    if (dst->x > max.x)
-        dst->x = max.x;
-
-    // Clamp the y value.
-    dst->y = v.y;
-    if (dst->y < min.y)
-        dst->y = min.y;
-    if (dst->y > max.y)
-        dst->y = max.y;
-
-    // Clamp the z value.
-    dst->z = v.z;
-    if (dst->z < min.z)
-        dst->z = min.z;
-    if (dst->z > max.z)
-        dst->z = max.z;
+    const Magnum::Vector3 result = Magnum::Math::clamp(
+        Magnum::Vector3{v.x, v.y, v.z}, Magnum::Vector3{min.x, min.y, min.z}, Magnum::Vector3{max.x, max.y, max.z});
+    dst->x = result.x();
+    dst->y = result.y();
+    dst->z = result.z();
 }
 
 void Vec3::cross(const Vec3& v)
@@ -111,43 +84,40 @@ void Vec3::cross(const Vec3& v1, const Vec3& v2, Vec3* dst)
 {
     AX_ASSERT(dst);
 
-    // NOTE: This code assumes Vec3 struct members are contiguous floats in memory.
-    // We might want to revisit this (and other areas of code that make this assumption)
-    // later to guarantee 100% safety/compatibility.
-    MathUtil::crossVec3(&v1.x, &v2.x, &dst->x);
+    const Magnum::Vector3 result =
+        Magnum::Math::cross(Magnum::Vector3{v1.x, v1.y, v1.z}, Magnum::Vector3{v2.x, v2.y, v2.z});
+    dst->x = result.x();
+    dst->y = result.y();
+    dst->z = result.z();
 }
 
 float Vec3::distance(const Vec3& v) const
 {
-    float dx = v.x - x;
-    float dy = v.y - y;
-    float dz = v.z - z;
-
-    return std::sqrt(dx * dx + dy * dy + dz * dz);
+    return (Magnum::Vector3{v.x, v.y, v.z} - Magnum::Vector3{x, y, z}).length();
 }
 
 float Vec3::distanceSquared(const Vec3& v) const
 {
-    float dx = v.x - x;
-    float dy = v.y - y;
-    float dz = v.z - z;
-
-    return (dx * dx + dy * dy + dz * dz);
+    const float dx = v.x - x;
+    const float dy = v.y - y;
+    const float dz = v.z - z;
+    return dx * dx + dy * dy + dz * dz;
 }
 
 float Vec3::dot(const Vec3& v) const
 {
-    return (x * v.x + y * v.y + z * v.z);
+    return x * v.x + y * v.y + z * v.z;
 }
 
 float Vec3::dot(const Vec3& v1, const Vec3& v2)
 {
-    return (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z);
+    return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
 }
 
 void Vec3::normalize()
 {
-    float n = x * x + y * y + z * z;
+    const Magnum::Vector3 value{x, y, z};
+    float n = value.dot();
     // Already normalized.
     if (n == 1.0f)
         return;
@@ -157,10 +127,10 @@ void Vec3::normalize()
     if (n < MATH_TOLERANCE)
         return;
 
-    n = 1.0f / n;
-    x *= n;
-    y *= n;
-    z *= n;
+    const Magnum::Vector3 result = value * (1.0f / n);
+    x                            = result.x();
+    y                            = result.y();
+    z                            = result.z();
 }
 
 Vec3 Vec3::getNormalized() const
@@ -183,7 +153,12 @@ void Vec3::smooth(const Vec3& target, float elapsedTime, float responseTime)
 {
     if (elapsedTime > 0)
     {
-        *this += (target - *this) * (elapsedTime / (elapsedTime + responseTime));
+        const Magnum::Vector3 result =
+            Magnum::Math::lerp(Magnum::Vector3{x, y, z}, Magnum::Vector3{target.x, target.y, target.z},
+                               elapsedTime / (elapsedTime + responseTime));
+        x = result.x();
+        y = result.y();
+        z = result.z();
     }
 }
 

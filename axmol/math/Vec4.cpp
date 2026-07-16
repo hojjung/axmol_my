@@ -23,10 +23,29 @@
 #include "axmol/math/Vec4.h"
 
 #include <cmath>
-#include "axmol/math/MathUtil.h"
+#include <Magnum/Math/Functions.h>
+#include <Magnum/Math/Quaternion.h>
+#include <Magnum/Math/Vector4.h>
+
 #include "axmol/base/Macros.h"
 
 NS_AX_MATH_BEGIN
+
+namespace
+{
+Magnum::Vector4 toMagnum(const Vec4Base& value)
+{
+    return {value.x, value.y, value.z, value.w};
+}
+
+void assign(Vec4Base& destination, const Magnum::Vector4& value)
+{
+    destination.x = value.x();
+    destination.y = value.y();
+    destination.z = value.z();
+    destination.w = value.w();
+}
+}  // namespace
 
 #if defined(AX_DLLEXPORT) || defined(AX_DLLIMPORT)
 const Vec4 Vec4::zero(0.0f, 0.0f, 0.0f, 0.0f);
@@ -37,29 +56,7 @@ void Vec4Base::clamp(const Vec4Base& min, const Vec4Base& max)
 {
     AX_ASSERT(!(min.x > max.x || min.y > max.y || min.z > max.z || min.w > max.w));
 
-    // Clamp the x value.
-    if (x < min.x)
-        x = min.x;
-    if (x > max.x)
-        x = max.x;
-
-    // Clamp the y value.
-    if (y < min.y)
-        y = min.y;
-    if (y > max.y)
-        y = max.y;
-
-    // Clamp the z value.
-    if (z < min.z)
-        z = min.z;
-    if (z > max.z)
-        z = max.z;
-
-    // Clamp the z value.
-    if (w < min.w)
-        w = min.w;
-    if (w > max.w)
-        w = max.w;
+    assign(*this, Magnum::Math::clamp(toMagnum(*this), toMagnum(min), toMagnum(max)));
 }
 
 void Vec4Base::clamp(const Vec4Base& v, const Vec4Base& min, const Vec4Base& max, Vec4Base* dst)
@@ -67,33 +64,7 @@ void Vec4Base::clamp(const Vec4Base& v, const Vec4Base& min, const Vec4Base& max
     AX_ASSERT(dst);
     AX_ASSERT(!(min.x > max.x || min.y > max.y || min.z > max.z || min.w > max.w));
 
-    // Clamp the x value.
-    dst->x = v.x;
-    if (dst->x < min.x)
-        dst->x = min.x;
-    if (dst->x > max.x)
-        dst->x = max.x;
-
-    // Clamp the y value.
-    dst->y = v.y;
-    if (dst->y < min.y)
-        dst->y = min.y;
-    if (dst->y > max.y)
-        dst->y = max.y;
-
-    // Clamp the z value.
-    dst->z = v.z;
-    if (dst->z < min.z)
-        dst->z = min.z;
-    if (dst->z > max.z)
-        dst->z = max.z;
-
-    // Clamp the w value.
-    dst->w = v.w;
-    if (dst->w < min.w)
-        dst->w = min.w;
-    if (dst->w > max.w)
-        dst->w = max.w;
+    assign(*dst, Magnum::Math::clamp(toMagnum(v), toMagnum(min), toMagnum(max)));
 }
 
 bool Vec4::isZero() const
@@ -108,11 +79,11 @@ bool Vec4::isOne() const
 
 float Vec4::angle(const Vec4& v1, const Vec4& v2)
 {
-    float dx = v1.w * v2.x - v1.x * v2.w - v1.y * v2.z + v1.z * v2.y;
-    float dy = v1.w * v2.y - v1.y * v2.w - v1.z * v2.x + v1.x * v2.z;
-    float dz = v1.w * v2.z - v1.z * v2.w - v1.x * v2.y + v1.y * v2.x;
-
-    return std::atan2(std::sqrt(dx * dx + dy * dy + dz * dz) + MATH_FLOAT_SMALL, dot(v1, v2));
+    const Magnum::Quaternion a{{v1.x, v1.y, v1.z}, v1.w};
+    const Magnum::Quaternion b{{v2.x, v2.y, v2.z}, v2.w};
+    const Magnum::Vector3 relative =
+        a.scalar() * b.vector() - b.scalar() * a.vector() - Magnum::Math::cross(a.vector(), b.vector());
+    return std::atan2(relative.length() + MATH_FLOAT_SMALL, Magnum::Math::dot(a, b));
 }
 
 void Vec4::add(const Vec4& v1, const Vec4& v2, Vec4* dst)
@@ -127,47 +98,42 @@ void Vec4::add(const Vec4& v1, const Vec4& v2, Vec4* dst)
 
 float Vec4::distance(const Vec4& val) const
 {
-    float dx = val.x - x;
-    float dy = val.y - y;
-    float dz = val.z - z;
-    float dw = val.w - w;
-
-    return std::sqrt(dx * dx + dy * dy + dz * dz + dw * dw);
+    return (toMagnum(val) - toMagnum(*this)).length();
 }
 
 float Vec4::distanceSquared(const Vec4& val) const
 {
-    float dx = val.x - x;
-    float dy = val.y - y;
-    float dz = val.z - z;
-    float dw = val.w - w;
-
-    return (dx * dx + dy * dy + dz * dz + dw * dw);
+    const float dx = val.x - x;
+    const float dy = val.y - y;
+    const float dz = val.z - z;
+    const float dw = val.w - w;
+    return dx * dx + dy * dy + dz * dz + dw * dw;
 }
 
 float Vec4::dot(const Vec4& val) const
 {
-    return (x * val.x + y * val.y + z * val.z + w * val.w);
+    return x * val.x + y * val.y + z * val.z + w * val.w;
 }
 
 float Vec4::dot(const Vec4& v1, const Vec4& v2)
 {
-    return (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w);
+    return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w;
 }
 
 float Vec4::length() const
 {
-    return std::sqrt(x * x + y * y + z * z + w * w);
+    return toMagnum(*this).length();
 }
 
 float Vec4::lengthSquared() const
 {
-    return (x * x + y * y + z * z + w * w);
+    return x * x + y * y + z * z + w * w;
 }
 
 void Vec4::normalize()
 {
-    float n = x * x + y * y + z * z + w * w;
+    const Magnum::Vector4 value = toMagnum(*this);
+    float n                     = value.dot();
     // Already normalized.
     if (n == 1.0f)
         return;
@@ -177,11 +143,7 @@ void Vec4::normalize()
     if (n < MATH_TOLERANCE)
         return;
 
-    n = 1.0f / n;
-    x *= n;
-    y *= n;
-    z *= n;
-    w *= n;
+    assign(*this, value * (1.0f / n));
 }
 
 Vec4 Vec4::getNormalized() const

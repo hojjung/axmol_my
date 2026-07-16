@@ -37,7 +37,6 @@ set(GAME_SOURCE
     Source/axmol/3d/StylizedMaterialTests.cpp
     Source/axmol/3d/StylizedInstancingTests.cpp
     Source/axmol/3d/StylizedRendererTests.cpp
-    Source/axmol/3d/TerrainTests.cpp
 
     Source/axmol/base/MapTests.cpp
     Source/axmol/base/UTF8Tests.cpp
@@ -46,6 +45,7 @@ set(GAME_SOURCE
     Source/axmol/base/VectorTests.cpp
 
     Source/axmol/math/FastRNGTests.cpp
+    Source/axmol/math/MagnumVecQuatContractTests.cpp
     Source/axmol/math/MathUtilTests.cpp
 
     Source/axmol/network/UriTests.cpp

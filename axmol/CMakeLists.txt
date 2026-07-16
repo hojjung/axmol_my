@@ -379,10 +379,6 @@ if(APPLE)
 endif()
 
 if(WASM)
-  if(${EMSCRIPTEN_VERSION} VERSION_GREATER_EQUAL "3.1.51" AND NOT AX_PROFILE_STYLIZED_WEB)
-    target_link_options(${_AX_CORE_LIB} PUBLIC -sGL_ENABLE_GET_PROC_ADDRESS)
-  endif()
-
   if(AX_ENABLE_WEBSOCKET)
     target_link_options(${_AX_CORE_LIB} PUBLIC -lwebsocket.js)
   endif()
@@ -402,16 +398,14 @@ if(IOS)
 endif()
 
 ax_find_shaders(${_AX_ROOT}/axmol/renderer/shaders _builtin_shaders)
-if(AX_PROFILE_STYLIZED_WEB)
-  set(_stylized_web_shaders)
-  foreach(_shader IN LISTS _builtin_shaders)
-    get_filename_component(_shader_name "${_shader}" NAME)
-    if(_shader_name IN_LIST AX_STYLIZED_WEB_SHADER_ALLOWLIST)
-      list(APPEND _stylized_web_shaders "${_shader}")
-    endif()
-  endforeach()
-  set(_builtin_shaders ${_stylized_web_shaders})
-endif()
+set(_web_runtime_shaders)
+foreach(_shader IN LISTS _builtin_shaders)
+  get_filename_component(_shader_name "${_shader}" NAME)
+  if(_shader_name IN_LIST AX_WEB_SHADER_ALLOWLIST)
+    list(APPEND _web_runtime_shaders "${_shader}")
+  endif()
+endforeach()
+set(_builtin_shaders ${_web_runtime_shaders})
 set(_AX_BUILTIN_SHADERS ${_builtin_shaders} CACHE STATIC "" FORCE)
 
 # configure engine builtin light num
@@ -455,23 +449,22 @@ set_source_files_properties(
   ${_AX_ROOT}/axmol/renderer/shaders/stylizedShadow.frag
   PROPERTIES AXSLCC_OUTPUT1 "STYLIZED_ALPHA_CUTOUT=1"
 )
-if(AX_PROFILE_STYLIZED_WEB AND WASM)
-  set(_stylized_web_cold_sources
+if(WASM)
+  set(_web_runtime_cold_sources
     ${_AX_ROOT}/axmol/3d/GltfLoader.cpp
   )
   set_property(
-    SOURCE ${_stylized_web_cold_sources}
+    SOURCE ${_web_runtime_cold_sources}
     APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Release>:-Oz>"
   )
   set_property(
-    SOURCE ${_stylized_web_cold_sources}
+    SOURCE ${_web_runtime_cold_sources}
     PROPERTY SKIP_PRECOMPILE_HEADERS ON
   )
 endif()
 ax_add_shader_target_for(${_AX_CORE_LIB} FILES ${_builtin_shaders} BUILTIN)
 
 ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_MFMEDIA)
-ax_config_pred(${_AX_CORE_LIB} AX_PROFILE_STYLIZED_WEB)
 ax_config_pred1(${_AX_CORE_LIB} AX_WASM_ENABLE_DEVTOOLS)
 ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_MSEDGE_WEBVIEW2)
 ax_config_pred(${_AX_CORE_LIB} AX_ENABLE_PHYSICS_2D)

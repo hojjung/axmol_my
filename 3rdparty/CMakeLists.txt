@@ -63,6 +63,8 @@ else()
 endif()
 
 add_library(3rdparty INTERFACE)
+include(${_AX_ROOT}/cmake/Modules/AXEngineDependencies.cmake)
+ax_add_engine_dependencies()
 
 set(_1kfetch_cache_dir "${_AX_ROOT}/cache" CACHE STRING "" FORCE)
 
@@ -232,7 +234,7 @@ endif()
 ax_add_3rd(pugixml)
 ax_add_3rd(xxhash)
 
-if(AX_PROFILE_STYLIZED_WEB AND WASM)
+if(WASM)
   # PNG and XML parsing are cold asset-loading paths. Keep the frame renderer
   # at -O3 while compiling these libraries for the download-size budget.
   target_compile_options(png PRIVATE "$<$<CONFIG:Release>:-Oz>")
@@ -255,7 +257,7 @@ if(AX_ENABLE_GLTF)
   target_include_directories(3rdparty INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/cgltf")
   target_compile_definitions(3rdparty INTERFACE AX_ENABLE_GLTF=1 AX_ENABLE_KTX2=1)
 
-  if(AX_PROFILE_STYLIZED_WEB AND WASM)
+  if(WASM)
     target_compile_options(meshoptimizer PRIVATE "$<$<CONFIG:Release>:-Oz>")
     target_compile_options(basisu_transcoder PRIVATE "$<$<CONFIG:Release>:-Oz>")
   endif()
@@ -366,7 +368,7 @@ if(AX_ENABLE_AUDIO)
 endif()
 
 if(WINDOWS OR LINUX OR ANDROID OR WASM)
-  if((AX_ENABLE_VK OR AX_ENABLE_GL) AND NOT (WASM AND AX_PROFILE_STYLIZED_WEB))
+  if((AX_ENABLE_VK OR AX_ENABLE_GL) AND NOT WASM)
     ax_add_3rd(glad)
   endif()
 endif()

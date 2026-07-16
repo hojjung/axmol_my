@@ -2,9 +2,9 @@ if(NOT DEFINED AX_STYLIZED_WEB_HTML OR NOT EXISTS "${AX_STYLIZED_WEB_HTML}")
   message(FATAL_ERROR "AX_STYLIZED_WEB_HTML must name the built stylized-smoke HTML file")
 endif()
 
-if(NOT DEFINED AX_STYLIZED_WEB_BASELINE_BROTLI_BYTES OR
-   NOT AX_STYLIZED_WEB_BASELINE_BROTLI_BYTES MATCHES "^[0-9]+$")
-  message(FATAL_ERROR "AX_STYLIZED_WEB_BASELINE_BROTLI_BYTES must be a non-negative integer")
+if(NOT DEFINED AX_WEB_BASELINE_BROTLI_BYTES OR
+   NOT AX_WEB_BASELINE_BROTLI_BYTES MATCHES "^[0-9]+$")
+  message(FATAL_ERROR "AX_WEB_BASELINE_BROTLI_BYTES must be a non-negative integer")
 endif()
 
 find_program(BROTLI_EXECUTABLE NAMES brotli)
@@ -39,14 +39,14 @@ foreach(_extension IN ITEMS wasm js)
   message(STATUS "${_output_name}.${_extension} Brotli q11: ${_compressed_size} bytes")
 endforeach()
 
-if(_total_size GREATER AX_STYLIZED_WEB_BASELINE_BROTLI_BYTES)
-  math(EXPR _delta "${_total_size} - ${AX_STYLIZED_WEB_BASELINE_BROTLI_BYTES}")
+if(_total_size GREATER AX_WEB_BASELINE_BROTLI_BYTES)
+  math(EXPR _delta "${_total_size} - ${AX_WEB_BASELINE_BROTLI_BYTES}")
   message(FATAL_ERROR
     "Stylized Web size gate failed: ${_total_size} > "
-    "${AX_STYLIZED_WEB_BASELINE_BROTLI_BYTES} bytes (+${_delta})")
+    "${AX_WEB_BASELINE_BROTLI_BYTES} bytes (+${_delta})")
 endif()
 
-math(EXPR _headroom "${AX_STYLIZED_WEB_BASELINE_BROTLI_BYTES} - ${_total_size}")
+math(EXPR _headroom "${AX_WEB_BASELINE_BROTLI_BYTES} - ${_total_size}")
 message(STATUS
   "Stylized Web size gate passed: ${_total_size} <= "
-  "${AX_STYLIZED_WEB_BASELINE_BROTLI_BYTES} bytes (${_headroom} bytes headroom)")
+  "${AX_WEB_BASELINE_BROTLI_BYTES} bytes (${_headroom} bytes headroom)")

@@ -3,11 +3,57 @@
 #include "cmc/game_core/HexBoard.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <string_view>
 #include <vector>
+
+namespace allocation_probe
+{
+std::size_t count = 0;
+bool enabled      = false;
+
+void* allocate(std::size_t size)
+{
+    if (enabled)
+        ++count;
+    if (auto* memory = std::malloc(size == 0 ? 1 : size))
+        return memory;
+    std::abort();
+}
+}  // namespace allocation_probe
+
+void* operator new(std::size_t size)
+{
+    return allocation_probe::allocate(size);
+}
+
+void* operator new[](std::size_t size)
+{
+    return allocation_probe::allocate(size);
+}
+
+void operator delete(void* memory) noexcept
+{
+    std::free(memory);
+}
+
+void operator delete[](void* memory) noexcept
+{
+    std::free(memory);
+}
+
+void operator delete(void* memory, std::size_t) noexcept
+{
+    std::free(memory);
+}
+
+void operator delete[](void* memory, std::size_t) noexcept
+{
+    std::free(memory);
+}
 
 namespace
 {
@@ -68,6 +114,27 @@ void testHexBoard()
     check(!oversized.tryFindNextStep(-1, 0, 1, next, distance), "invalid path input fails safely");
 }
 
+void testHexBoardPathWorkspace()
+{
+    const HexBoard board(10, 5, {});
+    std::int32_t next     = -1;
+    std::int32_t distance = -1;
+    check(board.tryFindNextStep(0, 24, 1, next, distance), "path workspace warmup succeeds");
+
+    allocation_probe::count   = 0;
+    allocation_probe::enabled = true;
+    bool stable               = true;
+    for (std::int32_t i = 0; i < 2048; ++i)
+    {
+        const auto found = board.tryFindNextStep(0, 24, 1, next, distance);
+        stable           = stable && found && next == 1 && distance == 5;
+    }
+    allocation_probe::enabled = false;
+
+    check(stable, "reused path workspace preserves deterministic route");
+    checkEqual(static_cast<std::int32_t>(allocation_probe::count), 0, "path search performs no heap allocations");
+}
+
 void testRandom()
 {
     DeterministicRandom random(1);
@@ -96,6 +163,27 @@ void testUnitySmokeGolden()
     {
         check(false, "smoke event sequence is large enough to inspect");
     }
+}
+
+void testRandomTargetDeterminism()
+{
+    auto request = createSmokeBattleRequest();
+    request.seed = 1;
+    auto& caster = request.teams[0].units[0];
+    caster.stats.energyOnAttack = ENERGY_FULL;
+    caster.skills[0].targetRule = TargetRule::RandomEnemy;
+
+    const auto first  = BattleSimulator{}.simulate(request);
+    const auto second = BattleSimulator{}.simulate(request);
+    checkEqual(first.checksum, second.checksum, "random target sequence remains deterministic");
+
+    const auto taunt = std::find_if(first.events.begin(), first.events.end(), [](const BattleLogEvent& event) {
+        return event.type == BattleEventType::StatusApplied && event.actorId == 101 &&
+               event.status == StatusType::Taunt;
+    });
+    check(taunt != first.events.end(), "random-target skill applies taunt");
+    if (taunt != first.events.end())
+        checkEqual(taunt->targetId, 202, "seeded random target keeps unit-id order selection");
 }
 
 void checkInvalid(const BattleSimulateRequest& request, BattleValidationError expected, std::string_view message)
@@ -209,8 +297,10 @@ void testDragonDeterminism()
 int main()
 {
     testHexBoard();
+    testHexBoardPathWorkspace();
     testRandom();
     testUnitySmokeGolden();
+    testRandomTargetDeterminism();
     testInvalidRequests();
     testDragonDeterminism();
     if (failures != 0)

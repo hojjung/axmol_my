@@ -60,6 +60,7 @@ function(ax_link_cxx_prebuilt APP_NAME AX_ROOT_DIR AX_PREBUILT_DIR)
     PRIVATE NOUNCRYPT=1
     PRIVATE P2T_STATIC_EXPORTS=1
     PRIVATE BT_USE_SSE_IN_API=1
+    PRIVATE ENTT_NOEXCEPTION
   )
 
   if(AX_GLES_PROFILE)
@@ -105,6 +106,11 @@ function(ax_link_cxx_prebuilt APP_NAME AX_ROOT_DIR AX_PREBUILT_DIR)
     PRIVATE ${AX_ROOT_DIR}/3rdparty/robin-map/include
     PRIVATE ${AX_ROOT_DIR}/3rdparty/freetype/include
     PRIVATE ${AX_ROOT_DIR}/3rdparty/glfw/include/GLFW
+    PRIVATE ${AX_ROOT_DIR}/3rdparty/corrade/src
+    PRIVATE ${AX_ROOT_DIR}/${AX_PREBUILT_DIR}/_deps/corrade-build/src
+    PRIVATE ${AX_ROOT_DIR}/3rdparty/magnum/src
+    PRIVATE ${AX_ROOT_DIR}/${AX_PREBUILT_DIR}/_deps/magnum-build/src
+    PRIVATE ${AX_ROOT_DIR}/3rdparty/entt/src
     PRIVATE ${AX_ROOT_DIR}/3rdparty/box2d/include
     PRIVATE ${AX_ROOT_DIR}/${AX_PREBUILT_DIR}/engine/3rdparty/freetype/include
     PRIVATE ${AX_ROOT_DIR}/3rdparty/webp/src/webp
@@ -148,6 +154,10 @@ function(ax_link_cxx_prebuilt APP_NAME AX_ROOT_DIR AX_PREBUILT_DIR)
   # Linking engine and 3rdparty libs
   set(LIBS
     axmol
+    "$<$<CONFIG:Debug>:Magnum-d>"
+    "$<$<NOT:$<CONFIG:Debug>>:Magnum>"
+    "$<$<CONFIG:Debug>:CorradeUtility-d>"
+    "$<$<NOT:$<CONFIG:Debug>>:CorradeUtility>"
     box2d
     freetype
     pugixml
@@ -171,12 +181,16 @@ function(ax_link_cxx_prebuilt APP_NAME AX_ROOT_DIR AX_PREBUILT_DIR)
     list(APPEND LIBS webp)
   endif()
 
-  if((AX_ENABLE_GL OR AX_ENABLE_VK) AND NOT (WASM AND AX_PROFILE_STYLIZED_WEB))
+  if((AX_ENABLE_GL OR AX_ENABLE_VK) AND NOT WASM)
     list(APPEND LIBS glad)
   endif()
 
   if(AX_ENABLE_OPUS)
     list(APPEND LIBS opus)
+  endif()
+
+  if(UNIX)
+    list(APPEND LIBS ${CMAKE_DL_LIBS})
   endif()
 
   ax_link_pred(AX_ENABLE_EXT_DRAGONBONES "DragonBones" "${AX_ROOT_DIR}/extensions/DragonBones/src")

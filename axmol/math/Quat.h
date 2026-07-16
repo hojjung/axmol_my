@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include <Magnum/Math/Quaternion.h>
+
 #include "axmol/base/Macros.h"
 #include "axmol/math/Vec3.h"
 #include "axmol/math/Mat4.h"
@@ -158,15 +160,20 @@ public:
     {
         AX_ASSERT(dst);
 
-        float halfAngle    = angle * 0.5f;
-        float sinHalfAngle = sinf(halfAngle);
+        const Magnum::Vector3 magnumAxis{axis.x, axis.y, axis.z};
+        const float axisLength = magnumAxis.length();
+        if (axisLength < MATH_TOLERANCE)
+        {
+            dst->setIdentity();
+            return;
+        }
 
-        Vec3 normal(axis);
-        normal.normalize();
-        dst->x = normal.x * sinHalfAngle;
-        dst->y = normal.y * sinHalfAngle;
-        dst->z = normal.z * sinHalfAngle;
-        dst->w = cosf(halfAngle);
+        const Magnum::Quaternion result =
+            Magnum::Quaternion::rotation(Magnum::Rad{angle}, magnumAxis * (1.0f / axisLength));
+        dst->x = result.vector().x();
+        dst->y = result.vector().y();
+        dst->z = result.vector().z();
+        dst->w = result.scalar();
     }
 
     /**
@@ -385,15 +392,12 @@ public:
      */
     Vec3 operator*(const Vec3& v) const
     {
-        Vec3 uv, uuv;
-        Vec3 qvec(x, y, z);
-        Vec3::cross(qvec, v, &uv);
-        Vec3::cross(qvec, uv, &uuv);
-
-        uv *= (2.0f * w);
-        uuv *= 2.0f;
-
-        return v + uv + uuv;
+        const Magnum::Quaternion rotation{{x, y, z}, w};
+        const Magnum::Vector3 input{v.x, v.y, v.z};
+        const Magnum::Vector3 twiceCross = 2.0f * Magnum::Math::cross(rotation.vector(), input);
+        const Magnum::Vector3 result =
+            input + rotation.scalar() * twiceCross + Magnum::Math::cross(rotation.vector(), twiceCross);
+        return {result.x(), result.y(), result.z()};
     }
 
     /**

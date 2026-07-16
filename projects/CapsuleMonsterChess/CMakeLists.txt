@@ -47,12 +47,9 @@ set(CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules
 )
 
-# Apply the engine's lightweight stylized Web defaults before feature options
-# are declared. Native builds remain unchanged unless AX_PROFILE_STYLIZED_WEB
-# is explicitly enabled.
-if(DEFINED ENV{AX_ROOT} AND EXISTS "$ENV{AX_ROOT}/cmake/Profiles/AXStylizedWeb.cmake")
-  include("$ENV{AX_ROOT}/cmake/Profiles/AXStylizedWeb.cmake")
-endif()
+# Load the engine's single supported WebGL2 stylized runtime before feature
+# options are declared. A missing AX_ROOT is a configuration error.
+include("$ENV{AX_ROOT}/cmake/Modules/AXWebRuntime.cmake")
 
 # NOTE: The order of the cmake module "include(AXGame...)" statements matters
 include(AXGameEngineOptions)
