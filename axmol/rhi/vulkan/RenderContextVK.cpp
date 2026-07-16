@@ -1046,7 +1046,7 @@ void RenderContextImpl::prepareDrawing()
     applyPendingDynamicStates();
 
     // Populate CPU-side uniforms via callbacks
-    for (auto& cb : _programState->getCallbackUniforms())
+    for (auto&& cb : _programState->getCallbackUniforms())
         cb.second(_programState, cb.first);
 
     // Acquire descriptor state, matching current pipeline layout

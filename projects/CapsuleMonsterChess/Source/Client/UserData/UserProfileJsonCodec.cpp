@@ -1,3 +1,5 @@
+#include "axmol/base/HashMap.h"
+
 #include "Client/UserData/UserProfileJsonCodec.h"
 
 #include "rapidjson/document.h"
@@ -6,7 +8,6 @@
 #include "rapidjson/stringbuffer.h"
 
 #include <array>
-#include <unordered_set>
 #include <utility>
 
 namespace
@@ -339,7 +340,7 @@ bool UserProfileJsonCodec::validate(const UserProfile& profile, std::string& err
         return false;
     }
 
-    std::unordered_set<int> ownedUnitIds;
+    ax::HashSet<int> ownedUnitIds;
     ownedUnitIds.reserve(profile.ownedUnits.size());
     for (const auto& unit : profile.ownedUnits)
     {
@@ -376,7 +377,7 @@ bool UserProfileJsonCodec::validate(const UserProfile& profile, std::string& err
 
     for (const auto& preset : profile.deckPresets)
     {
-        std::unordered_set<int> deckUnitIds;
+        ax::HashSet<int> deckUnitIds;
         for (const int unitId : preset.unitIds)
         {
             if (unitId < 0)
@@ -399,7 +400,7 @@ bool UserProfileJsonCodec::validate(const UserProfile& profile, std::string& err
         }
     }
 
-    std::unordered_set<int> questIds;
+    ax::HashSet<int> questIds;
     questIds.reserve(profile.questProgress.size());
     for (const auto& quest : profile.questProgress)
     {
@@ -431,7 +432,7 @@ bool UserProfileJsonCodec::validate(const UserProfile& profile, std::string& err
     }
 
     const auto validateClaimedTiers = [&error](const std::vector<int>& tiers) {
-        std::unordered_set<int> uniqueTiers;
+        ax::HashSet<int> uniqueTiers;
         for (const int tier : tiers)
         {
             if (tier <= 0 || !uniqueTiers.emplace(tier).second)

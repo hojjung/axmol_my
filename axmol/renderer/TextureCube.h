@@ -29,7 +29,6 @@
 #include "axmol/rhi/Texture.h"
 
 #include <string>
-#include <unordered_map>
 #include "axmol/base/Types.h"
 
 namespace ax

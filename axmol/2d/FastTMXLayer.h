@@ -28,8 +28,9 @@ THE SOFTWARE.
 ****************************************************************************/
 #pragma once
 
+#include "axmol/base/HashMap.h"
+
 #include <span>
-#include <unordered_map>
 #include <vector>
 #include "axmol/scene/Node.h"
 #include "axmol/2d/TMXXMLParser.h"
@@ -78,8 +79,8 @@ struct TilesetBatch
 #endif
 
     std::map<int, int> indicesVertexZOffsets;
-    std::unordered_map<int, int> indicesVertexZNumber;
-    std::unordered_map<int, CustomCommand*> customCommands;
+    ax::HashMap<int, int> indicesVertexZNumber;
+    ax::HashMap<int, CustomCommand*> customCommands;
 
     rhi::UniformLocation mvpMatrixLocation;
     rhi::UniformLocation textureLocation;
@@ -313,7 +314,7 @@ public:
      *
      * @return Map from gid of animated tile to its instance.
      */
-    const std::unordered_map<uint32_t, std::vector<TMXTileAnimFlag>>* getAnimTileCoord() { return &_animTileCoord; }
+    const ax::HashMap<uint32_t, std::vector<TMXTileAnimFlag>>* getAnimTileCoord() { return &_animTileCoord; }
 
     bool hasTileAnimation() const { return !_animTileCoord.empty(); }
 
@@ -374,7 +375,7 @@ protected:
     ValueMap _properties;
 
     /** map from gid of animated tile to its instance. Also useful for optimization*/
-    std::unordered_map<uint32_t, std::vector<TMXTileAnimFlag>> _animTileCoord;
+    ax::HashMap<uint32_t, std::vector<TMXTileAnimFlag>> _animTileCoord;
     /** pointer to the tile animation manager of this layer */
     TMXTileAnimManager* _tileAnimManager = nullptr;
 

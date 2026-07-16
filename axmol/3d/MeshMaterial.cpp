@@ -24,6 +24,8 @@
  THE SOFTWARE.
  ****************************************************************************/
 
+#include "axmol/base/HashMap.h"
+
 #include "axmol/3d/MeshMaterial.h"
 #include "axmol/3d/Mesh.h"
 #include "axmol/3d/StylizedMaterial.h"
@@ -41,7 +43,7 @@ namespace ax
 
 MeshMaterialCache* MeshMaterialCache::_cacheInstance = nullptr;
 
-std::unordered_map<std::string, MeshMaterial*> MeshMaterial::_materials;
+ax::StringHashMap<MeshMaterial*> MeshMaterial::_materials;
 MeshMaterial* MeshMaterial::_unLitMaterial         = nullptr;
 MeshMaterial* MeshMaterial::_unLitInstanceMaterial = nullptr;
 MeshMaterial* MeshMaterial::_unLitNoTexMaterial    = nullptr;

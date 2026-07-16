@@ -25,6 +25,8 @@
  THE SOFTWARE.
  ****************************************************************************/
 
+#include "axmol/base/HashMap.h"
+
 #include "axmol/2d/Label.h"
 #include <algorithm>
 #include <stddef.h>  // offsetof
@@ -1177,7 +1179,7 @@ bool Label::tryTextPlacement(float fontSize)
 
 void Label::updateBatchNode()
 {
-    const std::unordered_map<unsigned int, Texture2D*>& textures = _fontAtlas->getTextures();
+    const ax::HashMap<unsigned int, Texture2D*>& textures = _fontAtlas->getTextures();
     const size_t textureCount                                    = textures.size();
     const size_t nodeCount                                       = _batchNodes.size();
 

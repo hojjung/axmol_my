@@ -96,8 +96,6 @@ public:
     ~StylizedMaterial() override;
 
     Material* clone() const override;
-    StylizedMaterial* asStylizedMaterial() noexcept override { return this; }
-    const StylizedMaterial* asStylizedMaterial() const noexcept override { return this; }
 
     [[nodiscard]] const StylizedMaterialDesc& getDescription() const noexcept { return _desc; }
 

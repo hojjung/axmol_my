@@ -201,9 +201,9 @@ public:
      */
     float distanceSquared(const Vec2& val) const
     {
-        const float dx = val.x - x;
-        const float dy = val.y - y;
-        return dx * dx + dy * dy;
+        float dx = val.x - x;
+        float dy = val.y - y;
+        return (dx * dx + dy * dy);
     }
 
     /**
@@ -213,7 +213,7 @@ public:
      *
      * @return The dot product.
      */
-    float dot(const Vec2& val) const { return x * val.x + y * val.y; }
+    float dot(const Vec2& val) const { return (x * val.x + y * val.y); }
 
     /**
      * Returns the dot product between the specified vectors.
@@ -246,7 +246,7 @@ public:
      *
      * @see length
      */
-    float lengthSquared() const { return x * x + y * y; }
+    float lengthSquared() const { return (x * x + y * y); }
 
     /**
      * Negates this vector.
@@ -507,7 +507,7 @@ public:
      * @param s the constant to divide this vector with
      * @return a smaller vector
      */
-    Vec2 operator/(float s) const { return {x / s, y / s}; }
+    Vec2 operator/(float s) const { return Vec2(this->x / s, this->y / s); }
 
     /**
      * Determines if this vector is less than the given vector.
@@ -587,7 +587,7 @@ public:
      @since v2.1.4
      * @lua NA
      */
-    float getLength() const { return length(); }
+    float getLength() const { return sqrtf(x * x + y * y); }
 
     /** Calculates the square length of a Vec2 (not calling sqrt() )
      @return float
@@ -637,7 +637,7 @@ public:
      @since v2.1.4
      * @lua NA
      */
-    Vec2 getPerp() const { return {-y, x}; }
+    Vec2 getPerp() const { return Vec2(-y, x); }
 
     /** Calculates midpoint between two points.
      @return Vec2
@@ -670,7 +670,7 @@ public:
      @since v2.1.4
      * @lua NA
      */
-    Vec2 getRPerp() const { return {y, -x}; }
+    Vec2 getRPerp() const { return Vec2(y, -x); }
 
     /** Calculates the projection of this over other.
      @return Vec2
@@ -685,7 +685,7 @@ public:
      @since v2.1.4
      * @lua NA
      */
-    Vec2 rotate(const Vec2& other) const { return {x * other.x - y * other.y, x * other.y + y * other.x}; }
+    Vec2 rotate(const Vec2& other) const { return Vec2(x * other.x - y * other.y, x * other.y + y * other.x); }
 
     /** Unrotates two points.
      @return Vec2 vector with an angle of this.getAngle() - other.getAngle(),
@@ -693,7 +693,7 @@ public:
      @since v2.1.4
      * @lua NA
      */
-    Vec2 unrotate(const Vec2& other) const { return {x * other.x + y * other.y, y * other.x - x * other.y}; }
+    Vec2 unrotate(const Vec2& other) const { return Vec2(x * other.x + y * other.y, y * other.x - x * other.y); }
 
     /** Linear Interpolation between two points a and b
      @returns
@@ -703,7 +703,7 @@ public:
      @since v2.1.4
      * @lua NA
      */
-    Vec2 lerp(const Vec2& other, float alpha) const { return *this * (1.0f - alpha) + other * alpha; }
+    Vec2 lerp(const Vec2& other, float alpha) const { return *this * (1.f - alpha) + other * alpha; }
 
     /** Rotates a point counter clockwise by the angle around a pivot
      @param pivot is the pivot, naturally
@@ -815,12 +815,12 @@ inline Vec2 operator*(float x, const Vec2& val)
 
 inline Vec2 operator*(const Vec2& left, const Vec2& right)
 {
-    return {left.x * right.x, left.y * right.y};
+    return Vec2(left.x * right.x, left.y * right.y);
 }
 
 inline Vec2 operator/(const Vec2& left, const Vec2& right)
 {
-    return {left.x / right.x, left.y / right.y};
+    return Vec2(left.x / right.x, left.y / right.y);
 }
 
 using Point = Vec2;

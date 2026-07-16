@@ -58,6 +58,7 @@ set(_AX_BASE_HEADER
   base/Config.h
   base/FPSImages.h
   base/ZipUtils.h
+  base/HashMap.h
   base/Map.h
   base/text_utils.h
   base/ScriptSupport.h
@@ -133,4 +134,3 @@ set(_AX_BASE_SRC
   base/astc.cpp
   ${_AX_BASE_SPECIFIC_SRC}
 )
-

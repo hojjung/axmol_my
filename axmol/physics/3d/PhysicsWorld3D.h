@@ -26,6 +26,8 @@
 
 #pragma once
 
+#include "axmol/base/HashMap.h"
+
 #include "axmol/math/Math.h"
 #include "axmol/base/Object.h"
 #include "axmol/base/Config.h"
@@ -335,7 +337,7 @@ protected:
     JPH::PhysicsSystem _physicsSystem;
     JPH::JobSystemThreadPool _jobSystem;
     JPH::TempAllocatorImplWithMallocFallback _tempAllocator;
-    std::unordered_map<uint64_t, ContactInfo3D> _pairContacts;
+    ax::HashMap<uint64_t, ContactInfo3D> _pairContacts;
     std::vector<detail::QueuedContactEvent3D> _queuedEvents;
     std::mutex _eventMutex;
 

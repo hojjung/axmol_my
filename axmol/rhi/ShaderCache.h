@@ -24,14 +24,14 @@
  ****************************************************************************/
 #pragma once
 
+#include "axmol/base/HashMap.h"
+
 #include "axmol/rhi/RHITypes.h"
 #include "axmol/base/Object.h"
 #include "axmol/platform/PlatformMacros.h"
 #include "axmol/rhi/ShaderModule.h"
 
 #include <string>
-#include <unordered_map>
-
 namespace ax::rhi
 {
 /**
@@ -87,7 +87,7 @@ protected:
      */
     rhi::ShaderModule* acquireShaderModule(rhi::ShaderStage stage, Data& payload);
 
-    std::unordered_map<uint64_t, rhi::ShaderModule*> _cachedShaders;
+    ax::HashMap<uint64_t, rhi::ShaderModule*> _cachedShaders;
 };
 
 // end of _rhi group

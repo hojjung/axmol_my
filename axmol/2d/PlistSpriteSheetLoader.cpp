@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ****************************************************************************/
 
+#include "axmol/base/HashMap.h"
+
 #include "axmol/2d/PlistSpriteSheetLoader.h"
 
 #include "axmol/platform/FileUtils.h"
@@ -364,17 +366,20 @@ void PlistSpriteSheetLoader::addSpriteFramesWithDictionary(ValueMap& dict,
         }
     }
 
-    Texture2D* texture                                                    = nullptr;
-    static std::unordered_map<std::string, rhi::PixelFormat> pixelFormats = {
-        {"RGBA8888", rhi::PixelFormat::RGBA8},
-        {"RGBA4444", rhi::PixelFormat::RGBA4},
-        {"RGB5A1", rhi::PixelFormat::RGB5A1},
-        {"RGBA5551", rhi::PixelFormat::RGB5A1},
-        {"RGB565", rhi::PixelFormat::RGB565},
-        {"R8", rhi::PixelFormat::R8},
-        {"RG8", rhi::PixelFormat::RG8},
-        //{"BGRA8888", rhi::PixelFormat::BGRA8888}, no Image conversion RGBA -> BGRA
-        {"RGB888", rhi::PixelFormat::RGB8}};
+    Texture2D* texture = nullptr;
+    static const auto pixelFormats = [] {
+        ax::StringHashMap<rhi::PixelFormat> formats;
+        formats.reserve(8);
+        formats.emplace("RGBA8888", rhi::PixelFormat::RGBA8);
+        formats.emplace("RGBA4444", rhi::PixelFormat::RGBA4);
+        formats.emplace("RGB5A1", rhi::PixelFormat::RGB5A1);
+        formats.emplace("RGBA5551", rhi::PixelFormat::RGB5A1);
+        formats.emplace("RGB565", rhi::PixelFormat::RGB565);
+        formats.emplace("R8", rhi::PixelFormat::R8);
+        formats.emplace("RG8", rhi::PixelFormat::RG8);
+        formats.emplace("RGB888", rhi::PixelFormat::RGB8);
+        return formats;
+    }();
 
     const auto pixelFormatIt = pixelFormats.find(pixelFormatName);
     if (pixelFormatIt != pixelFormats.end())

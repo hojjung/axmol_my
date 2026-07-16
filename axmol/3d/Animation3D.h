@@ -25,8 +25,6 @@
 
 #pragma once
 
-#include <unordered_map>
-
 #include "axmol/3d/AnimationCurve.h"
 
 #include "axmol/base/Macros.h"

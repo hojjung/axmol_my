@@ -76,9 +76,8 @@ MeshRenderer* createDragonFixture(const DragonFixtureStyle& style, std::string& 
     error.clear();
     auto* dragon   = MeshRenderer::create(DRAGON_ASSET);
     auto* skeleton = dragon ? dragon->getSkeleton() : nullptr;
-    auto* material = dragon && dragon->getMeshCount() > 0 && dragon->getMaterial(0)
-                         ? dragon->getMaterial(0)->asStylizedMaterial()
-                         : nullptr;
+    auto* material =
+        dragon && dragon->getMeshCount() > 0 ? dynamic_cast<StylizedMaterial*>(dragon->getMaterial(0)) : nullptr;
     auto* animation = dragon ? dragonAnimation() : nullptr;
 
     if (!dragon || !skeleton || !material || !material->isSkinned() || !animation || animation->getDuration() <= 0.0F)

@@ -22,39 +22,9 @@
 #include "axmol/math/Quat.h"
 
 #include <cmath>
-
-#include <Magnum/Math/Functions.h>
-#include <Magnum/Math/Quaternion.h>
-
 #include "axmol/base/Macros.h"
 
 NS_AX_MATH_BEGIN
-
-namespace
-{
-Magnum::Quaternion toMagnum(const Quat& value)
-{
-    return {{value.x, value.y, value.z}, value.w};
-}
-
-void assign(Quat& destination, const Magnum::Quaternion& value)
-{
-    destination.x = value.vector().x();
-    destination.y = value.vector().y();
-    destination.z = value.vector().z();
-    destination.w = value.scalar();
-}
-
-Magnum::Quaternion normalizedForInterpolation(const Magnum::Quaternion& value)
-{
-    const float lengthSquared = value.dot();
-    if (lengthSquared < 0.000001f)
-        return {{0.0f, 0.0f, 0.0f}, 1.0f};
-    if (lengthSquared == 1.0f)
-        return value;
-    return value * (1.0f / std::sqrt(lengthSquared));
-}
-}  // namespace
 
 #if defined(AX_DLLEXPORT) || defined(AX_DLLIMPORT)
 const Quat Quat::zero(0.0f, 0.0f, 0.0f, 0.0f);
@@ -86,6 +56,7 @@ void Quat::conjugate()
     x = -x;
     y = -y;
     z = -z;
+    // w =  w;
 }
 
 Quat Quat::getConjugated() const
@@ -97,11 +68,14 @@ Quat Quat::getConjugated() const
 
 bool Quat::inverse()
 {
-    const Magnum::Quaternion value = toMagnum(*this);
-    const float n                  = value.dot();
+    float n = x * x + y * y + z * z + w * w;
     if (n == 1.0f)
     {
-        assign(*this, value.conjugated());
+        x = -x;
+        y = -y;
+        z = -z;
+        // w = w;
+
         return true;
     }
 
@@ -109,7 +83,11 @@ bool Quat::inverse()
     if (n < 0.000001f)
         return false;
 
-    assign(*this, value.conjugated() * (1.0f / n));
+    n = 1.0f / n;
+    x = -x * n;
+    y = -y * n;
+    z = -z * n;
+    w = w * n;
 
     return true;
 }
@@ -129,13 +107,21 @@ void Quat::multiply(const Quat& q)
 void Quat::multiply(const Quat& q1, const Quat& q2, Quat* dst)
 {
     AX_ASSERT(dst);
-    assign(*dst, toMagnum(q1) * toMagnum(q2));
+
+    float x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y;
+    float y = q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x;
+    float z = q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w;
+    float w = q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z;
+
+    dst->x = x;
+    dst->y = y;
+    dst->z = z;
+    dst->w = w;
 }
 
 void Quat::normalize()
 {
-    const Magnum::Quaternion value = toMagnum(*this);
-    float n                        = value.dot();
+    float n = x * x + y * y + z * z + w * w;
 
     // Already normalized.
     if (n == 1.0f)
@@ -146,7 +132,11 @@ void Quat::normalize()
     if (n < 0.000001f)
         return;
 
-    assign(*this, value * (1.0f / n));
+    n = 1.0f / n;
+    x *= n;
+    y *= n;
+    z *= n;
+    w *= n;
 }
 
 Quat Quat::getNormalized() const
@@ -165,25 +155,14 @@ float Quat::toAxisAngle(Vec3* axis) const
 {
     AX_ASSERT(axis);
 
-    Magnum::Quaternion value  = toMagnum(*this);
-    const float squaredLength = value.dot();
-    const float length        = std::sqrt(squaredLength);
-    if (squaredLength != 1.0f && length >= 0.000001f)
-        value = value * (1.0f / length);
+    Quat q(x, y, z, w);
+    q.normalize();
+    axis->x = q.x;
+    axis->y = q.y;
+    axis->z = q.z;
+    axis->normalize();
 
-    const Magnum::Vector3 vector = value.vector();
-    const float axisLength       = vector.length();
-    if (axisLength < MATH_TOLERANCE)
-    {
-        axis->setZero();
-    }
-    else
-    {
-        const Magnum::Vector3 normalizedAxis = vector / axisLength;
-        axis->set(normalizedAxis.x(), normalizedAxis.y(), normalizedAxis.z());
-    }
-
-    return 2.0f * std::acos(value.scalar());
+    return (2.0f * std::acos(q.w));
 }
 
 void Quat::lerp(const Quat& q1, const Quat& q2, float t, Quat* dst)
@@ -193,19 +172,21 @@ void Quat::lerp(const Quat& q1, const Quat& q2, float t, Quat* dst)
 
     if (t == 0.0f)
     {
-        *dst = q1;
+        memcpy(dst, &q1, sizeof(float) * 4);
         return;
     }
-    if (t == 1.0f)
+    else if (t == 1.0f)
     {
-        *dst = q2;
+        memcpy(dst, &q2, sizeof(float) * 4);
         return;
     }
 
-    const float inverseT = 1.0f - t;
-    const Quat result{inverseT * q1.x + t * q2.x, inverseT * q1.y + t * q2.y, inverseT * q1.z + t * q2.z,
-                      inverseT * q1.w + t * q2.w};
-    *dst = result;
+    float t1 = 1.0f - t;
+
+    dst->x = t1 * q1.x + t * q2.x;
+    dst->y = t1 * q1.y + t * q2.y;
+    dst->z = t1 * q1.z + t * q2.z;
+    dst->w = t1 * q1.w + t * q2.w;
 }
 
 void Quat::slerp(const Quat& q1, const Quat& q2, float t, Quat* dst)
@@ -240,6 +221,10 @@ void Quat::slerp(float q1x,
                  float* dstz,
                  float* dstw)
 {
+    // Fast slerp implementation by kwhatmough:
+    // It contains no division operations, no trig, no inverse trig
+    // and no sqrt. Not only does this code tolerate small constraint
+    // errors in the input quaternions, it actually corrects for them.
     AX_ASSERT(dstx && dsty && dstz && dstw);
     AX_ASSERT(!(t < 0.0f || t > 1.0f));
 
@@ -269,36 +254,106 @@ void Quat::slerp(float q1x,
         return;
     }
 
-    const Magnum::Quaternion first = normalizedForInterpolation({{q1x, q1y, q1z}, q1w});
-    const Magnum::Quaternion second = normalizedForInterpolation({{q2x, q2y, q2z}, q2w});
-    const Magnum::Quaternion result = Magnum::Math::slerpShortestPath(first, second, t);
-    *dstx                           = result.vector().x();
-    *dsty                           = result.vector().y();
-    *dstz                           = result.vector().z();
-    *dstw                           = result.scalar();
+    float halfY, alpha, beta;
+    float u, f1, f2a, f2b;
+    float ratio1, ratio2;
+    float halfSecHalfTheta, versHalfTheta;
+    float sqNotU, sqU;
+
+    float cosTheta = q1w * q2w + q1x * q2x + q1y * q2y + q1z * q2z;
+
+    // As usual in all slerp implementations, we fold theta.
+    alpha = cosTheta >= 0 ? 1.0f : -1.0f;
+    halfY = 1.0f + alpha * cosTheta;
+
+    // Here we bisect the interval, so we need to fold t as well.
+    f2b = t - 0.5f;
+    u   = f2b >= 0 ? f2b : -f2b;
+    f2a = u - f2b;
+    f2b += u;
+    u += u;
+    f1 = 1.0f - u;
+
+    // One iteration of Newton to get 1-cos(theta / 2) to good accuracy.
+    halfSecHalfTheta = 1.09f - (0.476537f - 0.0903321f * halfY) * halfY;
+    halfSecHalfTheta *= 1.5f - halfY * halfSecHalfTheta * halfSecHalfTheta;
+    versHalfTheta = 1.0f - halfY * halfSecHalfTheta;
+
+    // Evaluate series expansions of the coefficients.
+    sqNotU = f1 * f1;
+    ratio2 = 0.0000440917108f * versHalfTheta;
+    ratio1 = -0.00158730159f + (sqNotU - 16.0f) * ratio2;
+    ratio1 = 0.0333333333f + ratio1 * (sqNotU - 9.0f) * versHalfTheta;
+    ratio1 = -0.333333333f + ratio1 * (sqNotU - 4.0f) * versHalfTheta;
+    ratio1 = 1.0f + ratio1 * (sqNotU - 1.0f) * versHalfTheta;
+
+    sqU    = u * u;
+    ratio2 = -0.00158730159f + (sqU - 16.0f) * ratio2;
+    ratio2 = 0.0333333333f + ratio2 * (sqU - 9.0f) * versHalfTheta;
+    ratio2 = -0.333333333f + ratio2 * (sqU - 4.0f) * versHalfTheta;
+    ratio2 = 1.0f + ratio2 * (sqU - 1.0f) * versHalfTheta;
+
+    // Perform the bisection and resolve the folding done earlier.
+    f1 *= ratio1 * halfSecHalfTheta;
+    f2a *= ratio2;
+    f2b *= ratio2;
+    alpha *= f1 + f2a;
+    beta = f1 + f2b;
+
+    // Apply final coefficients to a and b as usual.
+    float w = alpha * q1w + beta * q2w;
+    float x = alpha * q1x + beta * q2x;
+    float y = alpha * q1y + beta * q2y;
+    float z = alpha * q1z + beta * q2z;
+
+    // This final adjustment to the quaternion's length corrects for
+    // any small constraint error in the inputs q1 and q2 But as you
+    // can see, it comes at the cost of 9 additional multiplication
+    // operations. If this error-correcting feature is not required,
+    // the following code may be removed.
+    f1    = 1.5f - 0.5f * (w * w + x * x + y * y + z * z);
+    *dstw = w * f1;
+    *dstx = x * f1;
+    *dsty = y * f1;
+    *dstz = z * f1;
 }
 
 void Quat::slerpForSquad(const Quat& q1, const Quat& q2, float t, Quat* dst)
 {
     AX_ASSERT(dst);
 
-    const Magnum::Quaternion first  = normalizedForInterpolation(toMagnum(q1));
-    const Magnum::Quaternion second = normalizedForInterpolation(toMagnum(q2));
-    const float c                   = Magnum::Math::dot(first, second);
+    // cos(omega) = q1 * q2;
+    // slerp(q1, q2, t) = (q1*sin((1-t)*omega) + q2*sin(t*omega))/sin(omega);
+    // q1 = +- q2, slerp(q1,q2,t) = q1.
+    // This is a straight-forward implementation of the formula of slerp. It does not do any sign switching.
+    float c = q1.x * q2.x + q1.y * q2.y + q1.z * q2.z + q1.w * q2.w;
 
     if (std::abs(c) >= 1.0f)
     {
-        *dst = q1;
+        dst->x = q1.x;
+        dst->y = q1.y;
+        dst->z = q1.z;
+        dst->w = q1.w;
         return;
     }
 
-    if (1.0f - c * c <= 1.0e-10f)
+    float omega = std::acos(c);
+    float s     = std::sqrt(1.0f - c * c);
+    if (std::abs(s) <= 0.00001f)
     {
-        *dst = q1;
+        dst->x = q1.x;
+        dst->y = q1.y;
+        dst->z = q1.z;
+        dst->w = q1.w;
         return;
     }
 
-    assign(*dst, Magnum::Math::slerp(first, second, t));
+    float r1 = std::sin((1 - t) * omega) / s;
+    float r2 = std::sin(t * omega) / s;
+    dst->x   = (q1.x * r1 + q2.x * r2);
+    dst->y   = (q1.y * r1 + q2.y * r2);
+    dst->z   = (q1.z * r1 + q2.z * r2);
+    dst->w   = (q1.w * r1 + q2.w * r2);
 }
 
 NS_AX_MATH_END

@@ -25,9 +25,9 @@
 
 #pragma once
 
-#include <vector>
-#include <unordered_map>
+#include "axmol/base/HashMap.h"
 
+#include <vector>
 #include "axmol/base/Object.h"
 #include "axmol/renderer/RenderCommand.h"
 
@@ -51,7 +51,7 @@ protected:
     GroupCommandManager();
     ~GroupCommandManager();
     bool init();
-    std::unordered_map<int, bool> _groupMapping;
+    ax::HashMap<int, bool> _groupMapping;
     std::vector<int> _unusedIDs;
 };
 

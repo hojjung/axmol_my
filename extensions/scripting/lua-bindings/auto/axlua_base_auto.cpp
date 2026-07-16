@@ -112139,7 +112139,7 @@ int lua_ax_base_FastTMXLayer_getAnimTileCoord(lua_State* tolua_S)
             return 0;
         }
         auto&& ret = obj->getAnimTileCoord();
-        object_to_luaval<std::unordered_map<unsigned int, std::vector<ax::TMXTileAnimFlag>>>(tolua_S, "std::unordered_map<unsigned int, std::vector<ax::TMXTileAnimFlag>>*",(std::unordered_map<unsigned int, std::vector<ax::TMXTileAnimFlag>>*)ret);
+        object_to_luaval<ax::HashMap<unsigned int, std::vector<ax::TMXTileAnimFlag>>>(tolua_S, "std::unordered_map<unsigned int, std::vector<ax::TMXTileAnimFlag>>*", ret);
         return 1;
     }
     luaL_error(tolua_S, "%s has wrong number of arguments: %d, was expecting %d \n", "ax.FastTMXLayer:getAnimTileCoord",argc, 0);
@@ -115561,4 +115561,3 @@ TOLUA_API int register_all_ax_base(lua_State* tolua_S)
     tolua_endmodule(tolua_S);
     return 1;
 }
-

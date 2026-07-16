@@ -147,7 +147,7 @@ FastTMXLayer::~FastTMXLayer()
         AX_SAFE_RELEASE(batch.tilesetInfo);
         AX_SAFE_RELEASE(batch.texture);
         AX_SAFE_RELEASE(batch.indexBuffer);
-        for (auto& [_, cmd] : batch.customCommands)
+        for (auto&& [_, cmd] : batch.customCommands)
         {
             cmd->releasePSVL();
             delete cmd;
@@ -167,7 +167,7 @@ void FastTMXLayer::setTileSet(TMXTilesetInfo* info)
         AX_SAFE_RELEASE(batch.tilesetInfo);
         AX_SAFE_RELEASE(batch.texture);
         AX_SAFE_RELEASE(batch.indexBuffer);
-        for (auto& [_, cmd] : batch.customCommands)
+        for (auto&& [_, cmd] : batch.customCommands)
         {
             cmd->releasePSVL();
             delete cmd;
@@ -541,7 +541,7 @@ void FastTMXLayer::updatePrimitives()
 {
     for (auto& batch : _batches)
     {
-        for (auto& [_, cmd] : batch.customCommands)
+        for (auto&& [_, cmd] : batch.customCommands)
             cmd->setIndexDrawInfo(0, 0);
 
         if (!batch.texture || !batch.indexBuffer)

@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include "axmol/base/HashMap.h"
+
 #include "axmol/scene/Node.h"
 #include "axmol/renderer/CustomCommand.h"
 #include "axmol/renderer/QuadCommand.h"
@@ -960,7 +962,7 @@ protected:
 
     std::vector<BatchCommand> _batchCommands;
 
-    std::unordered_map<int, Sprite*> _letters;
+    ax::HashMap<int, Sprite*> _letters;
 
     CustomEventListener* _resetTextureListener;
 

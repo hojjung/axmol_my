@@ -116,7 +116,6 @@ Mesh::Mesh()
     , _blend(BlendFunc::ALPHA_NON_PREMULTIPLIED)
     , _blendDirty(true)
     , _material(nullptr)
-    , _stylizedMaterial(nullptr)
     , _texFile("")
 {}
 Mesh::~Mesh()
@@ -452,7 +451,6 @@ void Mesh::setMaterial(Material* material)
         _material = material;
         AX_SAFE_RETAIN(_material);
     }
-    _stylizedMaterial = _material ? _material->asStylizedMaterial() : nullptr;
     _meshCommands.clear();
 
     if (_material)
@@ -478,7 +476,8 @@ void Mesh::setMaterial(Material* material)
                     // AXASSERT(vertexInputs.size() <= attributeCount, "missing attribute data");
                 }
 #endif
-                const bool usesInstanceStream = _stylizedMaterial ? !_stylizedMaterial->isSkinned() : _instancing;
+                const auto* stylizedMaterial  = dynamic_cast<const StylizedMaterial*>(_material);
+                const bool usesInstanceStream = stylizedMaterial ? !stylizedMaterial->isSkinned() : _instancing;
                 auto vertexInputBinding = VertexInputBinding::fetch(_meshIndexData, pass, &list[i], usesInstanceStream);
                 pass->setVertexInputBinding(vertexInputBinding);
                 i += 1;
@@ -529,8 +528,9 @@ void Mesh::draw(Renderer* renderer,
     // 'u_color' and others
     const auto scene              = ownerScene ? ownerScene : Director::getInstance()->getRunningScene();
     auto technique                = _material->_currentTechnique;
-    const bool usesInstanceStream = _stylizedMaterial ? !_skin : _instancing;
-    if (usesInstanceStream && !prepareInstanceData(_stylizedMaterial && !_instancing))
+    auto* stylizedMaterial        = dynamic_cast<StylizedMaterial*>(_material);
+    const bool usesInstanceStream = stylizedMaterial ? !_skin : _instancing;
+    if (usesInstanceStream && !prepareInstanceData(stylizedMaterial && !_instancing))
         return;
     for (const auto pass : technique->_passes)
     {
@@ -544,9 +544,9 @@ void Mesh::draw(Renderer* renderer,
         if (_skin)
             pass->setUniformMatrixPalette(_skin->getMatrixPalette(), _skin->getMatrixPaletteSizeInBytes());
 
-        if (_stylizedMaterial)
+        if (stylizedMaterial)
         {
-            setStylizedLightUniforms(pass, scene, *_stylizedMaterial, lightMask, transform);
+            setStylizedLightUniforms(pass, scene, *stylizedMaterial, lightMask, transform);
         }
         else if (scene && !scene->getLights().empty())
         {
@@ -782,8 +782,8 @@ void Mesh::bindMeshCommand()
     if (_material && _meshIndexData)
     {
         auto& stateBlock = _material->getStateBlock();
-        if (_stylizedMaterial)
-            stateBlock.setCullFace(!_stylizedMaterial->_desc.doubleSided);
+        if (const auto* stylized = dynamic_cast<const StylizedMaterial*>(_material))
+            stateBlock.setCullFace(!stylized->_desc.doubleSided);
         else
             stateBlock.setCullFace(true);
         stateBlock.setDepthTest(true);

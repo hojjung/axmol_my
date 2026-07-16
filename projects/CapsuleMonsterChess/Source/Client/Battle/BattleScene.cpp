@@ -395,6 +395,7 @@ void BattleScene::buildWorld()
     _battleWorldRoot->addChild(createHexRegion(2, 8, Color{0.14F, 0.27F, 0.28F, 1.0F}));
     _battleWorldRoot->addChild(createHexRegion(8, 10, Color{0.43F, 0.12F, 0.16F, 1.0F}));
 
+    _units.reserve(20);
     int createdUnits = 0;
     for (const game_core::BattleTeamSetup& team : _simulationRequest.teams)
     {

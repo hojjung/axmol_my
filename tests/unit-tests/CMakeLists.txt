@@ -45,7 +45,6 @@ set(GAME_SOURCE
     Source/axmol/base/VectorTests.cpp
 
     Source/axmol/math/FastRNGTests.cpp
-    Source/axmol/math/MagnumVecQuatContractTests.cpp
     Source/axmol/math/MathUtilTests.cpp
 
     Source/axmol/network/UriTests.cpp

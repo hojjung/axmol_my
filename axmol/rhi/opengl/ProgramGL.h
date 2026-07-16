@@ -34,8 +34,6 @@
 
 #include <string>
 #include <vector>
-#include <unordered_map>
-
 #include "axmol/tlx/vector.hpp"
 
 namespace ax::rhi::gl

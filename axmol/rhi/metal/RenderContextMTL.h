@@ -27,8 +27,6 @@
 
 #include "axmol/rhi/RenderContext.h"
 #include "axmol/rhi/metal/DriverMTL.h"
-#include <unordered_map>
-
 namespace ax::rhi::mtl
 {
 

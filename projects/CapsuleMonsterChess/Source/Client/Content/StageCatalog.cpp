@@ -1,3 +1,5 @@
+#include "axmol/base/HashMap.h"
+
 #include "Client/Content/StageCatalog.h"
 
 #include "axmol/platform/FileUtils.h"
@@ -5,7 +7,6 @@
 #include "rapidjson/error/en.h"
 
 #include <algorithm>
-#include <unordered_set>
 #include <utility>
 
 namespace
@@ -88,8 +89,10 @@ bool StageCatalog::load(std::string_view resourcePath, std::string& error)
         return false;
     }
 
-    std::unordered_set<int> stageIds;
-    std::unordered_set<int> stageNumbers;
+    ax::HashSet<int> stageIds;
+    ax::HashSet<int> stageNumbers;
+    stageIds.reserve(stages->value.Size());
+    stageNumbers.reserve(stages->value.Size());
     _entries.reserve(stages->value.Size());
 
     for (const auto& value : stages->value.GetArray())

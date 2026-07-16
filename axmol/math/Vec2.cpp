@@ -20,11 +20,8 @@
  */
 
 #include "axmol/math/Vec2.h"
+#include "axmol/math/MathUtil.h"
 #include "axmol/base/Macros.h"
-
-#include <Magnum/Math/Complex.h>
-#include <Magnum/Math/Functions.h>
-#include <Magnum/Math/Vector2.h>
 
 NS_AX_MATH_BEGIN
 
@@ -86,9 +83,8 @@ float crossProduct2Vector(const Vec2& A, const Vec2& B, const Vec2& C, const Vec
 
 float Vec2::angle(const Vec2& v1, const Vec2& v2)
 {
-    const Magnum::Vector2 a{v1.x, v1.y};
-    const Magnum::Vector2 b{v2.x, v2.y};
-    return std::atan2(std::abs(Magnum::Math::cross(a, b)) + MATH_FLOAT_SMALL, Magnum::Math::dot(a, b));
+    float dz = v1.x * v2.y - v1.y * v2.x;
+    return atan2f(fabsf(dz) + MATH_FLOAT_SMALL, dot(v1, v2));
 }
 
 void Vec2::add(const Vec2& v1, const Vec2& v2, Vec2* dst)
@@ -103,10 +99,17 @@ void Vec2::clamp(const Vec2& min, const Vec2& max)
 {
     AX_ASSERT(!(min.x > max.x || min.y > max.y));
 
-    const Magnum::Vector2 result =
-        Magnum::Math::clamp(Magnum::Vector2{x, y}, Magnum::Vector2{min.x, min.y}, Magnum::Vector2{max.x, max.y});
-    x = result.x();
-    y = result.y();
+    // Clamp the x value.
+    if (x < min.x)
+        x = min.x;
+    if (x > max.x)
+        x = max.x;
+
+    // Clamp the y value.
+    if (y < min.y)
+        y = min.y;
+    if (y > max.y)
+        y = max.y;
 }
 
 void Vec2::clamp(const Vec2& val, const Vec2& min, const Vec2& max, Vec2* dst)
@@ -114,31 +117,42 @@ void Vec2::clamp(const Vec2& val, const Vec2& min, const Vec2& max, Vec2* dst)
     AX_ASSERT(dst);
     AX_ASSERT(!(min.x > max.x || min.y > max.y));
 
-    const Magnum::Vector2 result = Magnum::Math::clamp(Magnum::Vector2{val.x, val.y}, Magnum::Vector2{min.x, min.y},
-                                                       Magnum::Vector2{max.x, max.y});
-    dst->x                       = result.x();
-    dst->y                       = result.y();
+    // Clamp the x value.
+    dst->x = val.x;
+    if (dst->x < min.x)
+        dst->x = min.x;
+    if (dst->x > max.x)
+        dst->x = max.x;
+
+    // Clamp the y value.
+    dst->y = val.y;
+    if (dst->y < min.y)
+        dst->y = min.y;
+    if (dst->y > max.y)
+        dst->y = max.y;
 }
 
 float Vec2::distance(const Vec2& val) const
 {
-    return (Magnum::Vector2{val.x, val.y} - Magnum::Vector2{x, y}).length();
+    float dx = val.x - x;
+    float dy = val.y - y;
+
+    return std::sqrt(dx * dx + dy * dy);
 }
 
 float Vec2::dot(const Vec2& v1, const Vec2& v2)
 {
-    return v1.x * v2.x + v1.y * v2.y;
+    return (v1.x * v2.x + v1.y * v2.y);
 }
 
 float Vec2::length() const
 {
-    return Magnum::Vector2{x, y}.length();
+    return std::sqrt(x * x + y * y);
 }
 
 void Vec2::normalize()
 {
-    const Magnum::Vector2 value{x, y};
-    float n = value.dot();
+    float n = x * x + y * y;
     // Already normalized.
     if (n == 1.0f)
         return;
@@ -148,9 +162,9 @@ void Vec2::normalize()
     if (n < MATH_TOLERANCE)
         return;
 
-    const Magnum::Vector2 result = value * (1.0f / n);
-    x                            = result.x();
-    y                            = result.y();
+    n = 1.0f / n;
+    x *= n;
+    y *= n;
 }
 
 Vec2 Vec2::getNormalized() const
@@ -162,11 +176,23 @@ Vec2 Vec2::getNormalized() const
 
 void Vec2::rotate(const Vec2& point, float angle)
 {
-    const Magnum::Vector2 pivot{point.x, point.y};
-    const Magnum::Vector2 result =
-        Magnum::Complex::rotation(Magnum::Rad{angle}).transformVector(Magnum::Vector2{x, y} - pivot) + pivot;
-    x = result.x();
-    y = result.y();
+    float sinAngle = std::sin(angle);
+    float cosAngle = std::cos(angle);
+
+    if (point.isZero())
+    {
+        float tempX = x * cosAngle - y * sinAngle;
+        y           = y * cosAngle + x * sinAngle;
+        x           = tempX;
+    }
+    else
+    {
+        float tempX = x - point.x;
+        float tempY = y - point.y;
+
+        x = tempX * cosAngle - tempY * sinAngle + point.x;
+        y = tempY * cosAngle + tempX * sinAngle + point.y;
+    }
 }
 
 void Vec2::subtract(const Vec2& v1, const Vec2& v2, Vec2* dst)

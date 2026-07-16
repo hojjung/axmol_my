@@ -624,7 +624,7 @@ void StylizedRenderer::submitShadowCaster(MeshRenderer& meshRenderer,
     // draws with the wrapper transform here.
     for (auto* mesh : meshRenderer._meshes)
     {
-        auto* material = mesh->getStylizedMaterial();
+        auto* material = dynamic_cast<StylizedMaterial*>(mesh->getMaterial());
         // The mobile shadow budget intentionally has opaque and alpha-cutout
         // casters only. Alpha-blended surfaces stay in the existing forward
         // transparent queue and do not cast a misleading solid silhouette.

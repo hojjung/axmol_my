@@ -25,6 +25,8 @@
  ****************************************************************************/
 
 #pragma once
+#include "axmol/base/HashMap.h"
+
 #include "axmol/platform/PlatformMacros.h"
 #include "axmol/audio/AudioMacros.h"
 #include "axmol/audio/AudioEffects.h"
@@ -32,8 +34,6 @@
 #include <functional>
 #include <list>
 #include <string>
-#include <unordered_map>
-
 #ifdef ERROR
 #    undef ERROR
 #endif  // ERROR
@@ -508,15 +508,16 @@ protected:
         AudioInfo();
         ~AudioInfo();
 
+        AudioInfo(AudioInfo&&) noexcept            = default;
+        AudioInfo& operator=(AudioInfo&&) noexcept = default;
+
     private:
-        AudioInfo(const AudioInfo& info);
-        AudioInfo(AudioInfo&& info);
-        AudioInfo& operator=(const AudioInfo& info);
-        AudioInfo& operator=(AudioInfo&& info);
+        AudioInfo(const AudioInfo& info)            = delete;
+        AudioInfo& operator=(const AudioInfo& info) = delete;
     };
 
     // audioID,audioAttribute
-    static std::unordered_map<AudioId, AudioInfo> _audioIDInfoMap;
+    static ax::HashMap<AudioId, AudioInfo> _audioIDInfoMap;
 
     // audio file path,audio IDs
     static tlx::string_map<std::list<AudioId>> _audioPathIDMap;

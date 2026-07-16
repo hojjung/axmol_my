@@ -25,8 +25,9 @@
  ****************************************************************************/
 #pragma once
 
+#include "axmol/base/HashMap.h"
+
 #include <string>
-#include <unordered_map>
 #include "axmol/base/Types.h"
 #include "axmol/renderer/Material.h"
 #include "axmol/3d/Bundle3DData.h"
@@ -137,7 +138,7 @@ public:
 
 protected:
     MaterialType _type;
-    static std::unordered_map<std::string, MeshMaterial*> _materials;  // cached material
+    static ax::StringHashMap<MeshMaterial*> _materials;  // cached material
     static MeshMaterial* _unLitMaterial;
     static MeshMaterial* _unLitInstanceMaterial;
     static MeshMaterial* _unLitNoTexMaterial;

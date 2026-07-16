@@ -747,7 +747,7 @@ void RenderContextImpl::prepareDrawing(ID3D12GraphicsCommandList* cmd)
 {
     // callback uniforms
     auto& callbackUniforms = _programState->getCallbackUniforms();
-    for (auto& cb : callbackUniforms)
+    for (auto&& cb : callbackUniforms)
         cb.second(_programState, cb.first);
 
     auto rootSigInfo = _renderPipeline->getRootSignature();
@@ -806,7 +806,7 @@ void RenderContextImpl::prepareDrawing(ID3D12GraphicsCommandList* cmd)
 
         // Copy descriptors for each texture in the binding set
         int maxSlot = -1;
-        for (auto& [bindingIndex, bindingSet] : textureBindingSets)
+        for (auto&& [bindingIndex, bindingSet] : textureBindingSets)
         {
             const auto count = static_cast<int>(bindingSet.texs.size());
             for (int i = 0; i < count; ++i)

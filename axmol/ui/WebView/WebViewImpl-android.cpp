@@ -23,9 +23,10 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  ****************************************************************************/
+#include "axmol/base/HashMap.h"
+
 #include "axmol/ui/WebView/WebViewImpl-android.h"
 
-#include <unordered_map>
 #include <stdlib.h>
 #include <string>
 #include "axmol/platform/android/jni/JniHelper.h"
@@ -179,7 +180,7 @@ namespace ax
 namespace ui
 {
 
-static std::unordered_map<int, ax::ui::WebViewImpl*> s_WebViewImpls;
+static ax::HashMap<int, ax::ui::WebViewImpl*> s_WebViewImpls;
 
 WebViewImpl::WebViewImpl(WebView* webView) : _viewTag(-1), _webView(webView)
 {

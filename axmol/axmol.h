@@ -45,6 +45,7 @@ THE SOFTWARE.
 #include "axmol/base/InputDelegate.h"
 #include "axmol/base/InputSystem.h"
 #include "axmol/base/Map.h"
+#include "axmol/base/HashMap.h"
 #include "axmol/base/Profiling.h"
 #include "axmol/base/Properties.h"
 #include "axmol/base/Object.h"

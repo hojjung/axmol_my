@@ -27,7 +27,7 @@
 
 #include <atomic>
 #include <chrono>
-#include <cstdint>
+#include <exception>
 #include <functional>
 #include <vector>
 #include <memory>
@@ -66,22 +66,8 @@ enum class JobStatus
     Completed,
     /// Cancellation was requested before or during execution.
     Canceled,
-    /// The job could not be accepted or reported an explicit failure.
+    /// The job function threw an exception. Use JobHandle::exception() to inspect it.
     Failed,
-};
-
-enum class JobErrorCode : std::uint8_t
-{
-    None,
-    ExecutorStopped,
-};
-
-struct JobError
-{
-    JobErrorCode code{JobErrorCode::None};
-    const char* message{nullptr};
-
-    constexpr explicit operator bool() const noexcept { return code != JobErrorCode::None; }
 };
 
 /**
@@ -112,8 +98,8 @@ public:
     bool isCancelRequested() const;
     /// Returns the current job status, or JobStatus::Canceled for an invalid handle.
     JobStatus status() const;
-    /// Returns the explicit failure recorded for this job.
-    JobError error() const;
+    /// Returns the exception captured from the job function, if status() is JobStatus::Failed.
+    std::exception_ptr exception() const;
 
     /**
      * @brief Request cooperative cancellation.

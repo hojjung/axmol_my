@@ -65,15 +65,6 @@ Controller* Controller::getControllerByDeviceId(int deviceId)
 
 void Controller::init()
 {
-    for (int key = Key::JOYSTICK_LEFT_X; key < Key::KEY_MAX; ++key)
-    {
-        _allKeyStatus[key].isPressed = false;
-        _allKeyStatus[key].value     = 0.0f;
-
-        _allKeyPrevStatus[key].isPressed = false;
-        _allKeyPrevStatus[key].value     = 0.0f;
-    }
-
     _eventDispatcher = Director::getInstance()->getEventDispatcher();
     _connectEvent    = new ControllerEvent(ControllerEvent::ControllerEventType::CONNECTION, this, false);
     _keyEvent        = new ControllerEvent(ControllerEvent::ControllerEventType::BUTTON_STATUS_CHANGED, this, 0);
@@ -82,13 +73,11 @@ void Controller::init()
 
 const Controller::KeyStatus& Controller::getKeyStatus(int keyCode)
 {
-    if (_allKeyStatus.find(keyCode) == _allKeyStatus.end())
-    {
-        _allKeyStatus[keyCode].isPressed = false;
-        _allKeyStatus[keyCode].value     = 0.0f;
-    }
+    static constexpr KeyStatus EMPTY_STATUS{false, 0.0F, false};
+    if (keyCode < Key::JOYSTICK_LEFT_X || keyCode >= Key::KEY_MAX)
+        return EMPTY_STATUS;
 
-    return _allKeyStatus[keyCode];
+    return _allKeyStatus[static_cast<std::size_t>(keyCode - Key::JOYSTICK_LEFT_X)];
 }
 
 void Controller::onConnected()
@@ -107,10 +96,12 @@ void Controller::onDisconnected()
 
 void Controller::onButtonEvent(int keyCode, bool isPressed, float value, bool isAnalog)
 {
-    _allKeyPrevStatus[keyCode]       = _allKeyStatus[keyCode];
-    _allKeyStatus[keyCode].isPressed = isPressed;
-    _allKeyStatus[keyCode].value     = value;
-    _allKeyStatus[keyCode].isAnalog  = isAnalog;
+    AXASSERT(keyCode >= Key::JOYSTICK_LEFT_X && keyCode < Key::KEY_MAX, "Controller key code is out of range");
+    const auto index                    = static_cast<std::size_t>(keyCode - Key::JOYSTICK_LEFT_X);
+    _allKeyPrevStatus[index]            = _allKeyStatus[index];
+    _allKeyStatus[index].isPressed      = isPressed;
+    _allKeyStatus[index].value          = value;
+    _allKeyStatus[index].isAnalog       = isAnalog;
 
     _keyEvent->setKeyCode(keyCode);
     _eventDispatcher->dispatchEvent(_keyEvent);
@@ -118,9 +109,11 @@ void Controller::onButtonEvent(int keyCode, bool isPressed, float value, bool is
 
 void Controller::onAxisEvent(int axisCode, float value, bool isAnalog)
 {
-    _allKeyPrevStatus[axisCode]      = _allKeyStatus[axisCode];
-    _allKeyStatus[axisCode].value    = value;
-    _allKeyStatus[axisCode].isAnalog = isAnalog;
+    AXASSERT(axisCode >= Key::JOYSTICK_LEFT_X && axisCode < Key::KEY_MAX, "Controller axis code is out of range");
+    const auto index               = static_cast<std::size_t>(axisCode - Key::JOYSTICK_LEFT_X);
+    _allKeyPrevStatus[index]       = _allKeyStatus[index];
+    _allKeyStatus[index].value     = value;
+    _allKeyStatus[index].isAnalog  = isAnalog;
 
     _axisEvent->setKeyCode(axisCode);
     _eventDispatcher->dispatchEvent(_axisEvent);

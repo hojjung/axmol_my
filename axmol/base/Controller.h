@@ -30,10 +30,9 @@
      defined(_WIN32) /* win32 & winuwp */ || AX_TARGET_PLATFORM == AX_PLATFORM_WASM)
 
 #    include "axmol/platform/PlatformMacros.h"
+#    include <array>
 #    include <string>
 #    include <vector>
-#    include <unordered_map>
-
 namespace ax
 {
 
@@ -208,8 +207,10 @@ private:
     void onAxisEvent(int axisCode, float value, bool isAnalog);
     void registerListeners();
 
-    std::unordered_map<int, KeyStatus> _allKeyStatus;
-    std::unordered_map<int, KeyStatus> _allKeyPrevStatus;
+    static constexpr std::size_t KEY_STATUS_COUNT = static_cast<std::size_t>(KEY_MAX - JOYSTICK_LEFT_X);
+
+    std::array<KeyStatus, KEY_STATUS_COUNT> _allKeyStatus{};
+    std::array<KeyStatus, KEY_STATUS_COUNT> _allKeyPrevStatus{};
 
     std::string _deviceName;
     int _deviceId;
@@ -237,8 +238,8 @@ private:
     // usage is negligible.  Peformance over memory optimization was
     // consciously chosen.
 
-    std::unordered_map<int, int> _buttonInputMap;
-    std::unordered_map<int, int> _axisInputMap;
+    ax::HashMap<int, int> _buttonInputMap;
+    ax::HashMap<int, int> _axisInputMap;
 #    endif
 
     friend class ControllerImpl;

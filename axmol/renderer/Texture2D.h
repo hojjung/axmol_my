@@ -28,8 +28,9 @@ THE SOFTWARE.
 
 #pragma once
 
+#include "axmol/base/HashMap.h"
+
 #include <string>
-#include <unordered_map>
 #include <span>
 #include <optional>
 
@@ -373,7 +374,7 @@ private:
     {
     public:
         Rect capInsetSize;
-        std::unordered_map<SpriteFrame*, Rect> capInsetMap;
+        ax::HashMap<SpriteFrame*, Rect> capInsetMap;
     };
 
     /**

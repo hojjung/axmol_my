@@ -26,6 +26,8 @@ THE SOFTWARE.
 ****************************************************************************/
 // Implement RenderView based on GLFW for targets: win32,osx,web(wasm)
 #pragma once
+#include "axmol/base/HashMap.h"
+
 #include "axmol/platform/GL.h"
 #include "axmol/base/Object.h"
 #include "axmol/platform/Common.h"
@@ -205,7 +207,7 @@ protected:
     uint32_t _pressedButtons{0};
 #endif
 
-    std::unordered_map<int, KeyboardEvent::KeyCode> _keyCodeMap;
+    ax::HashMap<int, KeyboardEvent::KeyCode> _keyCodeMap;
 
     GLFWwindow* _mainWindow;
     GLFWmonitor* _monitor;

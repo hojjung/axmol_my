@@ -31,8 +31,6 @@
 #include <string>
 #include <stdint.h>
 #include <vector>
-#include <unordered_map>
-
 namespace ax
 {
 class VertexLayoutManager;

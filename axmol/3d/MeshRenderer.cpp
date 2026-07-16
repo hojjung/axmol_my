@@ -24,6 +24,8 @@
  THE SOFTWARE.
  ****************************************************************************/
 
+#include "axmol/base/HashMap.h"
+
 #include "axmol/3d/MeshRenderer.h"
 #include "axmol/3d/MeshSkin.h"
 #if defined(AX_ENABLE_LEGACY_3D) && AX_ENABLE_LEGACY_3D
@@ -528,7 +530,7 @@ void MeshRenderer::setMaterial(Material* material, int meshIndex)
 
     bool sourceMaterialApplied = false;
     const auto materialForMesh = [material, &sourceMaterialApplied](Mesh* mesh) -> Material* {
-        if (auto* stylized = material->asStylizedMaterial())
+        if (auto* stylized = dynamic_cast<StylizedMaterial*>(material))
         {
             const bool meshIsSkinned = mesh->getSkin() != nullptr;
             if (stylized->isSkinned() != meshIsSkinned)
@@ -698,7 +700,7 @@ void MeshRenderer::genMaterial(bool useLight)
     {
         for (auto&& mesh : _meshes)
         {
-            if (mesh->getStylizedMaterial())
+            if (dynamic_cast<StylizedMaterial*>(mesh->getMaterial()))
                 continue;
 
             StylizedMaterialDesc desc;
@@ -719,7 +721,7 @@ void MeshRenderer::genMaterial(bool useLight)
     }
 #endif
 
-    std::unordered_map<const MeshVertexData*, MeshMaterial*> materials;
+    ax::HashMap<const MeshVertexData*, MeshMaterial*> materials;
     for (auto&& meshVertexData : _meshVertexDatas)
     {
         auto material = getMeshRendererMaterialForAttribs(meshVertexData, useLight);
@@ -1268,7 +1270,7 @@ void MeshRenderer::draw(Renderer* renderer, const Mat4& transform, uint32_t flag
 
     for (auto&& mesh : _meshes)
     {
-        if (auto* material = mesh->getStylizedMaterial())
+        if (auto* material = dynamic_cast<StylizedMaterial*>(mesh->getMaterial()))
         {
             if (auto* stylizedRenderer = scene ? StylizedRenderer::get(*scene) : nullptr)
                 stylizedRenderer->configureMaterial(*material, _receiveShadow);

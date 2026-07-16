@@ -31,8 +31,10 @@ THE SOFTWARE.
 #pragma once
 
 #include "axmol/2d/Action.h"
+#include "axmol/base/HashMap.h"
 #include "axmol/base/Vector.h"
 #include "axmol/base/Object.h"
+#include "axmol/tlx/vector.hpp"
 
 namespace ax
 {
@@ -194,19 +196,18 @@ public:
 
 protected:
     // declared in ActionManager.m
-    void removeTargetActionHandle(std::unordered_map<Node*, ActionHandle>::iterator& actionIt);
+    void removeTargetActionHandle(HashMap<Node*, ActionHandle>::iterator& actionIt);
 
-    void removeActionAtIndex(ssize_t index,
-                             ActionHandle& element,
-                             std::unordered_map<Node*, ActionHandle>::iterator actionIt);
+    void removeActionAtIndex(ssize_t index, ActionHandle& element, HashMap<Node*, ActionHandle>::iterator actionIt);
 
     void reserveActionCapacity(ActionHandle& element);
 
-    void eraseTargetActionHandle(std::unordered_map<Node*, ActionHandle>::iterator& actionIt);
+    void eraseTargetActionHandle(HashMap<Node*, ActionHandle>::iterator& actionIt);
 
 protected:
-    std::unordered_map<Node*, ActionHandle> _targets;
-    ActionHandle* _currentTarget;
+    HashMap<Node*, ActionHandle> _targets;
+    tlx::pod_vector<Node*> _targetKeys;
+    Node* _currentTargetKey;
     bool _currentTargetSalvaged;
 };
 

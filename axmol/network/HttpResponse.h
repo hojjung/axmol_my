@@ -28,7 +28,6 @@
 #pragma once
 #include <ctype.h>
 #include <map>
-#include <unordered_map>
 #include "axmol/network/HttpRequest.h"
 #include "axmol/network/Uri.h"
 #include "llhttp.h"

@@ -28,7 +28,6 @@
 
 /// @cond DO_NOT_SHOW
 
-#include <unordered_map>
 #include "axmol/base/Types.h"
 
 namespace ax

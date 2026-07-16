@@ -28,11 +28,12 @@
  */
 #pragma once
 
+#include "axmol/base/HashMap.h"
+
 #include "axmol/scene/Node.h"
 #include "axmol/renderer/GroupCommand.h"
 #include "axmol/renderer/CustomCommand.h"
 #include "axmol/renderer/CallbackCommand.h"
-#include <unordered_map>
 namespace ax
 {
 
@@ -167,7 +168,7 @@ protected:
 
     // CallbackCommand _afterDrawStencilCmd;
     // CallbackCommand _afterVisitCmd;
-    std::unordered_map<Node*, rhi::ProgramState*> _originalStencilProgramState;
+    ax::HashMap<Node*, rhi::ProgramState*> _originalStencilProgramState;
 
 private:
     AX_DISALLOW_COPY_AND_ASSIGN(ClippingNode);

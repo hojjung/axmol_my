@@ -178,12 +178,7 @@ public:
         return *static_cast<impl_type*>(this);
     }
 
-    inline impl_type operator-() const
-    {
-        impl_type result{*static_cast<const impl_type*>(this)};
-        result.negate();
-        return result;
-    }
+    inline impl_type& operator-() { return impl_type{*static_cast<impl_type*>(this)}.negate(); }
 
     /**
      * Adds the given vector to this vector.

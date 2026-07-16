@@ -28,12 +28,16 @@ THE SOFTWARE.
 ****************************************************************************/
 #pragma once
 
+#include "axmol/base/HashMap.h"
+
 #include "axmol/base/Protocols.h"
 #include "axmol/scene/Node.h"
 #include "axmol/base/Value.h"
 #include "axmol/2d/SpriteFrame.h"
 #include "axmol/2d/SpriteFrameCache.h"
 #include "axmol/math/FastRNG.h"
+
+#include <memory>
 
 namespace ax
 {
@@ -302,7 +306,7 @@ public:
     void removeAllMasks();
 
 private:
-    std::unordered_map<uint32_t, ParticleEmissionMaskDesc> masks;
+    ax::HashMap<uint32_t, std::unique_ptr<ParticleEmissionMaskDesc>> masks;
 };
 
 // typedef void (*AX_UPDATE_PARTICLE_IMP)(id, SEL, tParticle*, Vec2);
@@ -1632,9 +1636,9 @@ protected:
     /** wether to start from first or last when using life animation */
     bool _isAnimationReversed;
     /** A map that stores particle animation index coords */
-    std::unordered_map<unsigned short, ParticleFrameDesc> _animationIndices;
+    ax::HashMap<unsigned short, ParticleFrameDesc> _animationIndices;
     /** A map that stores particle animation descriptors */
-    std::unordered_map<unsigned short, ParticleAnimationDesc> _animations;
+    ax::HashMap<unsigned short, ParticleAnimationDesc> _animations;
     /** A vector that stores ids of animation descriptors that are choosen at random */
     std::vector<unsigned short> _randomAnimations;
     /** Wether the animation goes with the time scale of the system or is independent. */
@@ -1650,7 +1654,7 @@ protected:
     /** variable keeping count of emission shapes added */
     int _emissionShapeIndex;
     /** A map that stores emission shapes that are choosen at random */
-    std::unordered_map<unsigned short, EmissionShape> _emissionShapes;
+    ax::HashMap<unsigned short, EmissionShape> _emissionShapes;
 
     /** particles movement type: Free or Grouped
      @since v0.8

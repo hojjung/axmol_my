@@ -28,12 +28,12 @@ The RenderView for win32,linux,macos,wasm
 
 ****************************************************************************/
 
+#include "axmol/base/HashMap.h"
+
 #include "axmol/platform/pc/RenderView-pc.h"
 
 #include <algorithm>
 #include <cmath>
-#include <unordered_map>
-
 #include "axmol/platform/Application.h"
 #include "axmol/base/Director.h"
 #include "axmol/base/PointerEvent.h"
@@ -605,7 +605,8 @@ static void initWebInputBridge()
 
             // Cross the WebAssembly boundary to shoot the telemetry directly into C++ core
             // Appended parameters: ptrType (device type), e.button (triggering button), e.buttons (active button bitmask)
-            Module._axmol_onwebpointerevent(eventType, pointerId, canvasX, canvasY, rawPressure, ptrType, e.button, e.buttons || 0);
+            Module['_axmol_onwebpointerevent'](
+                eventType, pointerId, canvasX, canvasY, rawPressure, ptrType, e.button, e.buttons || 0);
         }
 
         // Bind Down Event: Triggers pointer locking/capturing for boundary-proof dragging
@@ -702,8 +703,9 @@ static void initWebInputBridge()
             // If pointerType is not present on wheel events, assume mouse (0).
 
             // Forward normalized scroll to native layer
-            // Module._axmol_onwebpointerscroll(id, x, y, deltaX, deltaY, ptrType, buttons)
-            Module._axmol_onwebpointerscroll(pid, canvasX, canvasY, deltaX, deltaY, ptrType, e.buttons || 0);
+            // Module['_axmol_onwebpointerscroll'](id, x, y, deltaX, deltaY, ptrType, buttons)
+            Module['_axmol_onwebpointerscroll'](
+                pid, canvasX, canvasY, deltaX, deltaY, ptrType, e.buttons || 0);
         }, { passive: false });
 
         console.log("[Axmol] Unified PointerEvents successfully attached to Canvas. Legacy GLFW mouse/touch bypassed.");
@@ -750,7 +752,7 @@ static void initWebInputBridge()
                 // Only dispatch IME if not hijacked by EditBox UI
                 if (e.data && proxy.getAttribute('data-mode') !== 'editbox') {
                     var result = stringToUTF8WithLen(e.data);
-                    Module._axmol_onwebinserttext(result.ptr, result.length);
+                    Module['_axmol_onwebinserttext'](result.ptr, result.length);
                     _free(result.ptr);
                     proxy.value = "";
                 }
@@ -764,7 +766,7 @@ static void initWebInputBridge()
                     if (e.cancelable) {
                         e.preventDefault();
                     }
-                    Module._axmol_onwebdeletebackward(1);
+                    Module['_axmol_onwebdeletebackward'](1);
                     proxy.value = "";
                     suppressNextDeleteInput = true;
                     setTimeout(function() {
@@ -786,7 +788,7 @@ static void initWebInputBridge()
                         proxy.value = "";
                         return;
                     }
-                    Module._axmol_onwebdeletebackward(1);
+                    Module['_axmol_onwebdeletebackward'](1);
                     proxy.value = "";
                 }
             }, { passive: false });
@@ -798,7 +800,7 @@ static void initWebInputBridge()
                 if (!isComposing && e.inputType !== 'deleteContentBackward') {
                     if (proxy.value) {
                         var result = stringToUTF8WithLen(proxy.value);
-                        Module._axmol_onwebinserttext(result.ptr, result.length);
+                        Module['_axmol_onwebinserttext'](result.ptr, result.length);
                         _free(result.ptr);
                     }
                     proxy.value = "";
@@ -808,7 +810,7 @@ static void initWebInputBridge()
                         proxy.value = "";
                         return;
                     }
-                    Module._axmol_onwebdeletebackward(1);
+                    Module['_axmol_onwebdeletebackward'](1);
                     proxy.value = "";
                 }
             });
@@ -1750,7 +1752,7 @@ void RenderView::onGLFWCharCallback(GLFWwindow* /*window*/, unsigned int charCod
         return;
 #endif
 
-    // static std::unordered_set<std::string_view> controlUnicode = {
+    // static ax::HashSet<std::string_view> controlUnicode = {
     //     "\xEF\x9C\x80",  // up
     //     "\xEF\x9C\x81",  // down
     //     "\xEF\x9C\x82",  // left
@@ -1763,18 +1765,21 @@ void RenderView::onGLFWCharCallback(GLFWwindow* /*window*/, unsigned int charCod
     //     "\xEF\x9C\xB9"   // clear
     // };
 
-    static const std::unordered_set<char32_t> controlUnicode = {
-        U'\uF700',  // up
-        U'\uF701',  // down
-        U'\uF702',  // left
-        U'\uF703',  // right
-        U'\uF728',  // delete
-        U'\uF729',  // home
-        U'\uF72B',  // end
-        U'\uF72C',  // pageup
-        U'\uF72D',  // pagedown
-        U'\uF739'   // clear
-    };
+    static const auto controlUnicode = [] {
+        ax::HashSet<char32_t> codepoints;
+        codepoints.reserve(10);
+        codepoints.emplace(U'\uF700');  // up
+        codepoints.emplace(U'\uF701');  // down
+        codepoints.emplace(U'\uF702');  // left
+        codepoints.emplace(U'\uF703');  // right
+        codepoints.emplace(U'\uF728');  // delete
+        codepoints.emplace(U'\uF729');  // home
+        codepoints.emplace(U'\uF72B');  // end
+        codepoints.emplace(U'\uF72C');  // pageup
+        codepoints.emplace(U'\uF72D');  // pagedown
+        codepoints.emplace(U'\uF739');  // clear
+        return codepoints;
+    }();
 
     // Check for send control key
 

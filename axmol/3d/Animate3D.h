@@ -26,9 +26,10 @@
 
 #pragma once
 
-#include <map>
-#include <unordered_map>
+#include "axmol/base/HashMap.h"
 
+#include <map>
+#include <memory>
 #include "axmol/3d/Animation3D.h"
 #include "axmol/base/Macros.h"
 #include "axmol/base/Object.h"
@@ -168,17 +169,17 @@ protected:
     EvaluateType _scaleEvaluate;
     Animate3DQuality _quality;
 
-    std::unordered_map<Bone3D*, Animation3D::Curve*> _boneCurves;  // weak ref
-    std::unordered_map<Node*, Animation3D::Curve*> _nodeCurves;
+    ax::HashMap<Bone3D*, Animation3D::Curve*> _boneCurves;  // weak ref
+    ax::HashMap<Node*, Animation3D::Curve*> _nodeCurves;
 
-    std::unordered_map<int, ValueMap> _keyFrameUserInfos;
-    std::unordered_map<int, CustomEvent*> _keyFrameEvent;
-    std::unordered_map<int, Animate3DDisplayedEventInfo> _displayedEventInfo;
+    ax::HashMap<int, std::unique_ptr<ValueMap>> _keyFrameUserInfos;
+    ax::HashMap<int, CustomEvent*> _keyFrameEvent;
+    ax::HashMap<int, std::unique_ptr<Animate3DDisplayedEventInfo>> _displayedEventInfo;
 
     // mesh animations
-    static std::unordered_map<Node*, Animate3D*> s_fadeInAnimates;
-    static std::unordered_map<Node*, Animate3D*> s_fadeOutAnimates;
-    static std::unordered_map<Node*, Animate3D*> s_runningAnimates;
+    static ax::HashMap<Node*, Animate3D*> s_fadeInAnimates;
+    static ax::HashMap<Node*, Animate3D*> s_fadeOutAnimates;
+    static ax::HashMap<Node*, Animate3D*> s_runningAnimates;
 };
 
 // end of 3d group
