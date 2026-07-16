@@ -1,5 +1,6 @@
 #include "AxmolRuntime.h"
 #include "BattleApi.h"
+#include "HttpCompression.h"
 #include "ServerMonsterCatalog.h"
 
 #include "Util/json.hpp"
@@ -10,11 +11,18 @@
 
 #include <boost/asio/io_context.hpp>
 
+#include <zlib.h>
+
+#include <array>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <utility>
 
 namespace
 {
@@ -52,6 +60,56 @@ Json makeRequest(const cmc::server::ServerMonsterCatalog& catalog)
                 {"contentHash", catalog.contentHash()},
                 {"playerUnits", std::move(playerUnits)},
                 {"enemyUnits", std::move(enemyUnits)}};
+}
+
+std::optional<std::string> decompressGzip(std::string_view input)
+{
+    if (input.size() > std::numeric_limits<uInt>::max())
+        return std::nullopt;
+
+    z_stream stream{};
+    stream.next_in  = reinterpret_cast<Bytef*>(const_cast<char*>(input.data()));
+    stream.avail_in = static_cast<uInt>(input.size());
+    if (inflateInit2(&stream, MAX_WBITS + 16) != Z_OK)
+        return std::nullopt;
+
+    std::string output;
+    std::array<char, 4096> chunk{};
+    int result = Z_OK;
+    while (result == Z_OK)
+    {
+        stream.next_out  = reinterpret_cast<Bytef*>(chunk.data());
+        stream.avail_out = static_cast<uInt>(chunk.size());
+        result           = inflate(&stream, Z_NO_FLUSH);
+        output.append(chunk.data(), chunk.size() - stream.avail_out);
+    }
+    inflateEnd(&stream);
+    return result == Z_STREAM_END ? std::optional<std::string>{std::move(output)} : std::nullopt;
+}
+
+void testHttpCompression()
+{
+    using cmc::server::http_support::acceptsGzip;
+
+    expect(acceptsGzip("gzip"), "gzip content coding is accepted");
+    expect(acceptsGzip("br, GZip; q=0.5"), "gzip matching is case insensitive");
+    expect(acceptsGzip("br, *;q=0.25"), "wildcard content coding accepts gzip");
+    expect(!acceptsGzip("br"), "unsupported content codings do not enable gzip");
+    expect(!acceptsGzip("gzip;q=0, *;q=1"), "explicit gzip rejection overrides wildcard");
+    expect(!acceptsGzip("gzip;q=invalid"), "malformed gzip quality is rejected");
+    expect(!acceptsGzip(""), "empty Accept-Encoding does not enable gzip");
+
+    const std::string source                    = R"({"events":[)" + std::string(64 * 1024, 'x') + R"(]})";
+    const std::optional<std::string> compressed = cmc::server::http_support::gzipCompress(source);
+    expect(compressed.has_value(), "gzip compression succeeds");
+    if (!compressed)
+        return;
+
+    expect(compressed->size() < source.size(), "gzip reduces a repetitive battle payload");
+    expect(compressed->size() >= 2 && static_cast<unsigned char>((*compressed)[0]) == 0x1F &&
+               static_cast<unsigned char>((*compressed)[1]) == 0x8B,
+           "gzip output contains the RFC 1952 magic bytes");
+    expect(decompressGzip(*compressed) == source, "gzip payload round-trips through zlib");
 }
 
 void testAxmolHeadlessPrimitives()
@@ -161,6 +219,7 @@ void testQueuedRuntimeShutdown()
 
 int main()
 {
+    testHttpCompression();
     testAxmolHeadlessPrimitives();
     testTamperedCatalogIsRejected();
     testQueuedRuntimeShutdown();

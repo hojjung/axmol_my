@@ -16,6 +16,7 @@ set(CMC_EXASTUDIO_ROOT "${CMC_DEFAULT_EXASTUDIO_ROOT}" CACHE PATH "ExaStudio exa
 set(CMC_BOOST_ROOT "${CMC_EXASTUDIO_ROOT}/3rd_party/boost" CACHE PATH "ExaStudio Boost root")
 set(CMC_EXA_JSON_INCLUDE "${CMC_EXASTUDIO_ROOT}/core/exaCore/include" CACHE PATH "ExaStudio json include root")
 set(CMC_MBEDTLS_ROOT "${CMC_EXASTUDIO_ROOT}/3rd_party/mbedtls" CACHE PATH "ExaStudio Mbed TLS root")
+set(CMC_ZLIB_ROOT "${CMC_AXMOL_ROOT}/3rdparty/zlib/_x" CACHE PATH "Axmol prebuilt zlib root")
 
 foreach(required_file
     "${CMC_AXMOL_ROOT}/axmol/base/Scheduler.cpp"
@@ -28,6 +29,27 @@ foreach(required_file
 endforeach()
 
 find_package(Threads REQUIRED)
+
+set(CMC_ZLIB_LIBRARY)
+if(APPLE)
+  set(CMC_ZLIB_LIBRARY "${CMC_ZLIB_ROOT}/lib/zlib.xcframework/macos-arm64_x86_64/libz.a")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    set(CMC_ZLIB_LIBRARY "${CMC_ZLIB_ROOT}/lib/linux/arm64/libz.a")
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+    set(CMC_ZLIB_LIBRARY "${CMC_ZLIB_ROOT}/lib/linux/x64/libz.a")
+  endif()
+endif()
+
+add_library(cmc_zlib INTERFACE)
+add_library(cmc::zlib ALIAS cmc_zlib)
+if(EXISTS "${CMC_ZLIB_ROOT}/include/zlib.h" AND EXISTS "${CMC_ZLIB_LIBRARY}")
+  target_include_directories(cmc_zlib INTERFACE "${CMC_ZLIB_ROOT}/include")
+  target_link_libraries(cmc_zlib INTERFACE "${CMC_ZLIB_LIBRARY}")
+else()
+  find_package(ZLIB REQUIRED)
+  target_link_libraries(cmc_zlib INTERFACE ZLIB::ZLIB)
+endif()
 
 if(APPLE)
   add_link_options("$<$<CONFIG:Release>:LINKER:-dead_strip>")
@@ -121,11 +143,24 @@ target_link_libraries(cmc_server_core
     Threads::Threads
 )
 
+add_library(cmc_http_support STATIC
+  src/HttpCompression.cpp
+)
+add_library(cmc::http_support ALIAS cmc_http_support)
+target_include_directories(cmc_http_support PUBLIC
+  "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+target_link_libraries(cmc_http_support PRIVATE cmc::zlib)
+
+if(NOT MSVC)
+  target_compile_options(cmc_http_support PRIVATE -Wall -Wextra)
+endif()
+
 add_executable(cmc_battle_server
   src/HttpServer.cpp
   src/main.cpp
 )
-target_link_libraries(cmc_battle_server PRIVATE cmc::server_core Threads::Threads)
+target_link_libraries(cmc_battle_server PRIVATE cmc::server_core cmc::http_support Threads::Threads)
 target_compile_definitions(cmc_battle_server PRIVATE
   CMC_DEFAULT_TABLE_PATH="${CMC_PROJECT_ROOT}/Content/Data/Tables/monster_unit_table.json"
 )
@@ -141,7 +176,12 @@ if(CMC_BUILD_SERVER_TESTS)
   target_include_directories(cmc_server_tests PRIVATE
     "${CMC_EXA_JSON_INCLUDE}"
   )
-  target_link_libraries(cmc_server_tests PRIVATE cmc::server_core cmc::axmol_headless)
+  target_link_libraries(cmc_server_tests PRIVATE
+    cmc::server_core
+    cmc::http_support
+    cmc::axmol_headless
+    cmc::zlib
+  )
   target_compile_definitions(cmc_server_tests PRIVATE
     CMC_TEST_TABLE_PATH="${CMC_PROJECT_ROOT}/Content/Data/Tables/monster_unit_table.json"
   )

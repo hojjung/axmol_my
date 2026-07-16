@@ -19,8 +19,10 @@ Function이 Auth, App Check, 클라이언트 버전과 Firestore 덱을 검증�
 seed를 생성한다. C++ 서버는 신뢰 경계를 지난 `uid`, 유닛 ID, 배치와 seed만 받고, 능력치는 서버가 가진
 canonical JSON에서 읽는다. MMR·보상·재화 쓰기는 Function의 Firestore transaction에서 확정한다.
 
-Cloud Run이 외부 HTTPS와 TLS를 종료하므로 컨테이너는 `0.0.0.0:$PORT`에서 HTTP를 수신한다. 첫
-마일스톤에는 WebSocket, 상주 매치 룸, Redis, 애플리케이션 mTLS를 추가하지 않는다.
+Cloud Run이 외부 HTTPS와 TLS를 종료하므로 컨테이너는 `0.0.0.0:$PORT`에서 HTTP를 수신한다.
+`Accept-Encoding: gzip`을 보낸 클라이언트에는 1 KiB 이상의 JSON 응답을 gzip level 1로 압축하고,
+`Content-Encoding: gzip`과 `Vary: Accept-Encoding`을 반환한다. 압축 미지원 클라이언트에는 기존 JSON을
+그대로 반환한다. 첫 마일스톤에는 WebSocket, 상주 매치 룸, Redis, 애플리케이션 mTLS를 추가하지 않는다.
 
 ## 빌드와 테스트
 
@@ -50,5 +52,6 @@ PORT=8080 ./build_server/bin/cmc_battle_server
 [examples/dragon_10v10.json](examples/dragon_10v10.json)에 있다.
 
 ExaStudio에서는 Boost 1.90의 header-only Asio/Beast, nlohmann JSON 단일 헤더, Mbed TLS의 SHA-256
-소스만 사용한다. `exaNetwork`, BS thread pool, curl, 전체 TLS 라이브러리는 링크하지 않는다. 세부
-라이선스 경로는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)에 기록한다.
+소스만 사용한다. HTTP 응답 압축에는 zlib을 사용한다. `exaNetwork`, BS thread pool, curl, 전체 TLS
+라이브러리는 링크하지 않는다. 세부 라이선스 경로는
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)에 기록한다.

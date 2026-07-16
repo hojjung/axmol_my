@@ -1,5 +1,7 @@
 #include "HttpServer.h"
 
+#include "HttpCompression.h"
+
 #include <boost/asio/socket_base.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
@@ -27,7 +29,24 @@ http::response<http::string_body> makeResponse(const http::request<http::string_
     http::response<http::string_body> response{static_cast<http::status>(status), request.version()};
     response.set(http::field::server, "cmc-battle-server/1");
     response.set(http::field::content_type, "application/json; charset=utf-8");
+    response.set(http::field::vary, "Accept-Encoding");
     response.keep_alive(request.keep_alive());
+
+    const auto acceptEncoding = request.find(http::field::accept_encoding);
+    if (body.size() >= http_support::MIN_GZIP_RESPONSE_BYTES && acceptEncoding != request.end())
+    {
+        const auto header = acceptEncoding->value();
+        if (http_support::acceptsGzip(std::string_view{header.data(), header.size()}))
+        {
+            if (std::optional<std::string> compressed = http_support::gzipCompress(body);
+                compressed && compressed->size() < body.size())
+            {
+                body = std::move(*compressed);
+                response.set(http::field::content_encoding, "gzip");
+            }
+        }
+    }
+
     response.body() = std::move(body);
     response.prepare_payload();
     return response;
