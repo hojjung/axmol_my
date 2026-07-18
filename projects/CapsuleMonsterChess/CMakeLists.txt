@@ -27,6 +27,10 @@ cmake_minimum_required(VERSION 3.22...4.1)
 
 set(APP_NAME CapsuleMonsterChess)
 
+set(CMC_DEFAULT_CHAT_URL "ws://127.0.0.1:8090/v1/chat" CACHE STRING
+  "Default Capsule Monster Chess lobby chat WebSocket URL"
+)
+
 project(${APP_NAME})
 
 if(EMSCRIPTEN)
@@ -99,6 +103,7 @@ ax_setup_app_config(${APP_NAME})
 # Add any libraries you need to link to the project after this point
 add_subdirectory(GameCore)
 target_link_libraries(${APP_NAME} cmc::game_core)
+target_compile_definitions(${APP_NAME} PRIVATE CMC_DEFAULT_CHAT_URL="${CMC_DEFAULT_CHAT_URL}")
 
 set(_cmc_gamecore_tests_default ON)
 if(CMAKE_CROSSCOMPILING)

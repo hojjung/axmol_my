@@ -272,6 +272,10 @@ Node& LobbyLayer::createOverlay()
 
 void LobbyLayer::closeOverlay()
 {
+    _chatMessageList = nullptr;
+    _chatInput       = nullptr;
+    _directTarget    = nullptr;
+    _chatStatusText  = nullptr;
     if (!_overlayRoot)
         return;
 

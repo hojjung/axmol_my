@@ -1,6 +1,7 @@
-# Server
+# Battle and Chat Servers
 
-private Cloud Run에서 실행하는 headless C++ 전투 서버다. 전체 `axmol` 라이브러리를 링크하지 않고
+같은 서버 프로젝트에서 전투와 채팅 실행 파일을 만들되, Cloud Run 서비스는 서로 분리한다.
+`cmc_battle_server`는 private Cloud Run에서 실행하는 headless C++ 전투 서버다. 전체 `axmol` 라이브러리를 링크하지 않고
 `Scheduler`, fixed-priority `CustomEvent`, 객체 수명 관리에 필요한 소스만 `cmc_axmol_headless`로 빌드한다.
 `Director`, `Scene`, Renderer/RHI, UI, 입력, 물리, 오디오, 네트워크 모듈은 서버 타깃에 포함하지 않는다.
 헤드리스 `EventDispatcher`에서는 Node/SceneGraph 우선순위 API와 상태도 컴파일하지 않는다.
@@ -22,7 +23,15 @@ canonical JSON에서 읽는다. MMR·보상·재화 쓰기는 Function의 Firest
 Cloud Run이 외부 HTTPS와 TLS를 종료하므로 컨테이너는 `0.0.0.0:$PORT`에서 HTTP를 수신한다.
 `Accept-Encoding: gzip`을 보낸 클라이언트에는 1 KiB 이상의 JSON 응답을 gzip level 1로 압축하고,
 `Content-Encoding: gzip`과 `Vary: Accept-Encoding`을 반환한다. 압축 미지원 클라이언트에는 기존 JSON을
-그대로 반환한다. 첫 마일스톤에는 WebSocket, 상주 매치 룸, Redis, 애플리케이션 mTLS를 추가하지 않는다.
+그대로 반환한다. 전투 서비스에는 WebSocket, 상주 매치 룸, Redis, 애플리케이션 mTLS를 추가하지 않는다.
+
+`cmc_chat_server`는 별도 포트와 프로세스에서 `/v1/chat` WebSocket을 제공한다. 언어 채널
+`en`, `zh`, `ko`, `ja`, 인증된 길드 ID 범위의 길드 채널, 두 UID로 결정되는 1:1 채널을 지원한다.
+방마다 최근 50개 메시지를 보관하고, 연결당 10초에 5개·메시지당 UTF-8 200자/768바이트로 제한한다.
+현재 저장소는 로컬 개발과 단일 인스턴스 검증을 위한 메모리 저장소다. 다중 인스턴스 배포에서는 인증
+게이트웨이가 Firebase ID token/App Check를 검증해 `uid`와 `guildId`를 주입하고, Redis Pub/Sub 및
+bounded history 저장소를 연결해야 한다. 클라이언트가 보낸 `hello` identity를 운영 환경에서 그대로
+신뢰하면 안 된다.
 
 ## 빌드와 테스트
 
@@ -35,13 +44,25 @@ cmake -S Server -B build_server -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build_server -j 8
 ctest --test-dir build_server --output-on-failure
 PORT=8080 ./build_server/bin/cmc_battle_server
+PORT=8090 ./build_server/bin/cmc_chat_server
 ```
 
 환경 변수:
 
 - `PORT`: 수신 포트, 기본값 `8080`
 - `CMC_SERVER_THREADS`: Asio worker 수, 범위 `1..32`
+- `CMC_CHAT_THREADS`: 채팅 Asio worker 수, 범위 `1..32`
 - `CMC_TABLE_PATH`: `monster_unit_table.json` 경로
+
+로컬 클라이언트 기본 주소는 `ws://127.0.0.1:8090/v1/chat`이다. 다른 주소는 CMake configure 시
+`-DCMC_DEFAULT_CHAT_URL=wss://chat.example.com/v1/chat`으로 지정하거나 실행 전 UserDefault의
+`cmc.chat.url`에 저장한다.
+
+채팅 command schema 1:
+
+- `{"type":"hello","schemaVersion":1,"userId":"...","displayName":"...","language":"ko","guildId":"..."}`
+- `{"type":"select","schemaVersion":1,"channel":"language|guild|direct","scope":"..."}`
+- `{"type":"send","schemaVersion":1,"text":"..."}`
 
 컴파일된 기본 테이블 경로는 로컬 개발 편의용이다. Cloud Run 이미지에서는 JSON을 이미지 내부에 복사하고
 `CMC_TABLE_PATH=/app/data/monster_unit_table.json`처럼 반드시 명시한다.

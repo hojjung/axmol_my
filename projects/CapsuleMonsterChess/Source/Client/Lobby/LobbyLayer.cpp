@@ -327,6 +327,19 @@ bool validateUserProfileProgression(const cmc::client::UserProfile& profile,
 
 namespace cmc::client
 {
+LobbyLayer::~LobbyLayer()
+{
+    unschedule("cmc_chat_reconnect");
+    if (!_chatClient)
+        return;
+
+    _chatClient->setStateCallback({});
+    _chatClient->setHistoryCallback({});
+    _chatClient->setMessageCallback({});
+    _chatClient->setErrorCallback({});
+    _chatClient->disconnect();
+}
+
 bool LobbyLayer::init()
 {
     if (!Layer::init())
@@ -385,6 +398,7 @@ bool LobbyLayer::init()
         }
     }
 
+    initializeChat();
     showMainLobby();
     return true;
 }
@@ -575,6 +589,10 @@ void LobbyLayer::showMainLobby()
     };
 
     const float profileWidth = profile->getContentSize().width;
+    auto* chatButton =
+        addShortcutButton(profileWidth - 266.0F, {}, "CH", "CHAT", Color32{39, 151, 145, 255});
+    chatButton->addClickEventListener([this](Object*) { showChatOverlay(); });
+
     auto* questButton =
         addShortcutButton(profileWidth - 202.0F, LOBBY_QUEST_ICON_PATH, "Q", "QUEST", Color32{169, 68, 124, 255});
     questButton->addClickEventListener([this](Object*) { showQuestOverlay(_questTab); });

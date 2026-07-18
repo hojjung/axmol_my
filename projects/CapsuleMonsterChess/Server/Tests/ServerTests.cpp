@@ -1,5 +1,7 @@
 #include "AxmolRuntime.h"
 #include "BattleApi.h"
+#include "ChatProtocol.h"
+#include "ChatServer.h"
 #include "HttpCompression.h"
 #include "ServerMonsterCatalog.h"
 
@@ -10,6 +12,9 @@
 #include "axmol/base/Scheduler.h"
 
 #include <boost/asio/io_context.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/beast/core.hpp>
+#include <boost/beast/websocket.hpp>
 
 #include <zlib.h>
 
@@ -22,6 +27,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 
 namespace
@@ -110,6 +116,172 @@ void testHttpCompression()
                static_cast<unsigned char>((*compressed)[1]) == 0x8B,
            "gzip output contains the RFC 1952 magic bytes");
     expect(decompressGzip(*compressed) == source, "gzip payload round-trips through zlib");
+}
+
+void testChatProtocol()
+{
+    using cmc::server::chat::Channel;
+    using cmc::server::chat::ChannelKind;
+    using cmc::server::chat::Identity;
+
+    const Identity identity{"user-17", "테스터", "ko", "guild-9"};
+    std::string error;
+    expect(cmc::server::chat::validateIdentity(identity, error), "Chat accepts a valid CJK identity");
+    expect(cmc::server::chat::roomKey(identity, Channel{ChannelKind::Language, "ko"}) == "language:ko",
+           "Language chat is partitioned by language");
+    expect(cmc::server::chat::roomKey(identity, Channel{ChannelKind::Guild, "guild-9"}) == "guild:guild-9",
+           "Guild chat is partitioned by authenticated guild");
+    expect(cmc::server::chat::roomKey(identity, Channel{ChannelKind::Direct, "user-3"}) ==
+               "direct:user-17:user-3",
+           "Direct chat room keys are stable for both participants");
+
+    const Identity peer{"user-3", "Peer", "en", ""};
+    expect(cmc::server::chat::roomKey(peer, Channel{ChannelKind::Direct, "user-17"}) ==
+               "direct:user-17:user-3",
+           "Direct chat participants resolve the same room key");
+
+    error.clear();
+    expect(!cmc::server::chat::validateChannel(identity, Channel{ChannelKind::Language, "fr"}, error),
+           "Unsupported language channels are rejected");
+    error.clear();
+    expect(!cmc::server::chat::validateChannel(peer, Channel{ChannelKind::Guild, ""}, error),
+           "Guild chat rejects users without a guild");
+    error.clear();
+    expect(!cmc::server::chat::validateChannel(identity, Channel{ChannelKind::Direct, "user-17"}, error),
+           "Direct chat rejects self targets");
+
+    std::string normalized;
+    error.clear();
+    expect(cmc::server::chat::validateMessageText("  안녕하세요  ", normalized, error) &&
+               normalized == "안녕하세요",
+           "Chat normalizes valid UTF-8 message whitespace");
+    error.clear();
+    expect(!cmc::server::chat::validateMessageText("\xF0\x28\x8C\x28", normalized, error),
+           "Chat rejects malformed UTF-8");
+    error.clear();
+    expect(!cmc::server::chat::validateMessageText(std::string(201, 'x'), normalized, error),
+           "Chat enforces the character limit");
+}
+
+class TestChatClient final
+{
+public:
+    explicit TestChatClient(std::uint16_t port) : socket_(ioContext_)
+    {
+        boost::asio::ip::tcp::resolver resolver(ioContext_);
+        const auto endpoints = resolver.resolve("127.0.0.1", std::to_string(port));
+        boost::asio::connect(socket_.next_layer(), endpoints);
+        socket_.handshake("127.0.0.1", "/v1/chat");
+    }
+
+    void send(const Json& command)
+    {
+        const std::string payload = command.dump();
+        socket_.write(boost::asio::buffer(payload));
+    }
+
+    Json receive()
+    {
+        boost::beast::flat_buffer buffer;
+        socket_.read(buffer);
+        return Json::parse(boost::beast::buffers_to_string(buffer.data()));
+    }
+
+    void close()
+    {
+        boost::system::error_code ignored;
+        socket_.close(boost::beast::websocket::close_code::normal, ignored);
+    }
+
+private:
+    boost::asio::io_context ioContext_;
+    boost::beast::websocket::stream<boost::asio::ip::tcp::socket> socket_;
+};
+
+Json helloCommand(std::string userId, std::string displayName, std::string language, std::string guildId)
+{
+    return Json{{"schemaVersion", cmc::server::chat::CHAT_SCHEMA_VERSION},
+                {"type", "hello"},
+                {"userId", std::move(userId)},
+                {"displayName", std::move(displayName)},
+                {"language", std::move(language)},
+                {"guildId", std::move(guildId)}};
+}
+
+Json selectCommand(std::string channel, std::string scope)
+{
+    return Json{{"schemaVersion", cmc::server::chat::CHAT_SCHEMA_VERSION},
+                {"type", "select"},
+                {"channel", std::move(channel)},
+                {"scope", std::move(scope)}};
+}
+
+Json sendCommand(std::string text)
+{
+    return Json{{"schemaVersion", cmc::server::chat::CHAT_SCHEMA_VERSION},
+                {"type", "send"},
+                {"text", std::move(text)}};
+}
+
+void testChatWebSocketIntegration()
+{
+    boost::asio::io_context serverContext;
+    cmc::server::ChatServer server(serverContext, 0);
+    server.start();
+    std::thread serverThread([&serverContext] { serverContext.run(); });
+
+    try
+    {
+        TestChatClient alice(server.port());
+        TestChatClient bob(server.port());
+        alice.send(helloCommand("alice", "앨리스", "ko", "knights"));
+        bob.send(helloCommand("bob", "Bob", "en", "knights"));
+        expect(alice.receive().value("type", "") == "ready", "Alice chat WebSocket handshake becomes ready");
+        expect(bob.receive().value("type", "") == "ready", "Bob chat WebSocket handshake becomes ready");
+
+        alice.send(selectCommand("language", "ko"));
+        bob.send(selectCommand("language", "ko"));
+        expect(alice.receive().value("type", "") == "history", "Language channel returns Alice history");
+        expect(bob.receive().value("type", "") == "history", "Language channel returns Bob history");
+        alice.send(sendCommand("한국어 채널 메시지"));
+        const Json aliceLanguage = alice.receive();
+        const Json bobLanguage   = bob.receive();
+        expect(aliceLanguage.value("text", "") == "한국어 채널 메시지",
+               "Language sender receives the broadcast");
+        expect(bobLanguage.value("text", "") == "한국어 채널 메시지",
+               "Language peer receives the broadcast");
+
+        alice.send(selectCommand("guild", "knights"));
+        bob.send(selectCommand("guild", "knights"));
+        alice.receive();
+        bob.receive();
+        bob.send(sendCommand("Guild hello"));
+        expect(alice.receive().value("channel", "") == "guild", "Guild member receives guild chat");
+        expect(bob.receive().value("channel", "") == "guild", "Guild sender receives guild chat");
+
+        alice.send(selectCommand("direct", "bob"));
+        alice.receive();
+        alice.send(sendCommand("private hello"));
+        expect(alice.receive().value("channel", "") == "direct", "Direct sender receives private chat");
+        const Json bobDirect = bob.receive();
+        expect(bobDirect.value("channel", "") == "direct" && bobDirect.value("text", "") == "private hello",
+               "Direct recipient receives private chat while viewing another channel");
+
+        bob.send(selectCommand("direct", "alice"));
+        const Json directHistory = bob.receive();
+        expect(directHistory.value("type", "") == "history" && directHistory.at("messages").size() == 1,
+               "Direct history is shared by both participants");
+        alice.close();
+        bob.close();
+    }
+    catch (const std::exception& error)
+    {
+        expect(false, error.what());
+    }
+
+    server.stop();
+    serverContext.stop();
+    serverThread.join();
 }
 
 void testAxmolHeadlessPrimitives()
@@ -220,6 +392,8 @@ void testQueuedRuntimeShutdown()
 int main()
 {
     testHttpCompression();
+    testChatProtocol();
+    testChatWebSocketIntegration();
     testAxmolHeadlessPrimitives();
     testTamperedCatalogIsRejected();
     testQueuedRuntimeShutdown();

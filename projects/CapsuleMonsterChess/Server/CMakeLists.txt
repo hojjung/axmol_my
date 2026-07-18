@@ -169,6 +169,37 @@ set_target_properties(cmc_battle_server PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
+add_library(cmc_chat_core STATIC
+  src/ChatProtocol.cpp
+  src/ChatServer.cpp
+)
+add_library(cmc::chat_core ALIAS cmc_chat_core)
+target_include_directories(cmc_chat_core
+  PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+  PRIVATE
+    "${CMC_BOOST_ROOT}"
+    "${CMC_EXA_JSON_INCLUDE}"
+)
+target_compile_definitions(cmc_chat_core PUBLIC
+  BOOST_ASIO_HEADER_ONLY=1
+  BOOST_ASIO_NO_DEPRECATED=1
+  BOOST_BEAST_USE_STD_STRING_VIEW=1
+  BOOST_ERROR_CODE_HEADER_ONLY=1
+  BOOST_SYSTEM_NO_LIB=1
+)
+target_link_libraries(cmc_chat_core PRIVATE Threads::Threads)
+if(NOT MSVC)
+  target_compile_options(cmc_chat_core PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+add_executable(cmc_chat_server src/ChatMain.cpp)
+target_include_directories(cmc_chat_server PRIVATE "${CMC_BOOST_ROOT}")
+target_link_libraries(cmc_chat_server PRIVATE cmc::chat_core Threads::Threads)
+set_target_properties(cmc_chat_server PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+
 option(CMC_BUILD_SERVER_TESTS "Build Capsule Monster Chess server tests" ON)
 if(CMC_BUILD_SERVER_TESTS)
   enable_testing()
@@ -178,6 +209,7 @@ if(CMC_BUILD_SERVER_TESTS)
   )
   target_link_libraries(cmc_server_tests PRIVATE
     cmc::server_core
+    cmc::chat_core
     cmc::http_support
     cmc::axmol_headless
     cmc::zlib
