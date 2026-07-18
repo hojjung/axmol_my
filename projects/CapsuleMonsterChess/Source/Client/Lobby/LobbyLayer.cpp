@@ -1,5 +1,7 @@
 #include "Client/Lobby/LobbyLayer.h"
 
+#include "Client/Rendering/UnitPreviewRenderer.h"
+
 #include "axmol/2d/DrawNode.h"
 #include "axmol/platform/FileUtils.h"
 
@@ -1549,11 +1551,25 @@ void LobbyLayer::showUnitDetail(int unitId, UnitDetailTab tab)
 
     auto* preview = makePanel({modalSize.width - 48.0F, 442.0F}, cardColor(elementColor(entry->element)), 255);
     preview->setPosition({24.0F, 630.0F});
+    preview->setClippingEnabled(true);
+    preview->setClippingType(ui::Layout::ClippingType::SCISSOR);
     modal->addChild(preview);
 
-    auto* artwork = makeUnitArtwork(*entry, {410.0F, 410.0F}, false);
-    artwork->setPosition({(preview->getContentSize().width - 410.0F) * 0.5F, 16.0F});
-    preview->addChild(artwork);
+    const Size previewSize{410.0F, 410.0F};
+    std::string previewError;
+    auto* unitPreview = createUnitPreview(*entry, previewSize, previewError);
+    if (unitPreview)
+    {
+        unitPreview->setPosition({(preview->getContentSize().width - previewSize.width) * 0.5F, 16.0F});
+        preview->addChild(unitPreview);
+    }
+    else
+    {
+        auto* artwork = makeUnitArtwork(*entry, previewSize, false);
+        artwork->setPosition({(preview->getContentSize().width - previewSize.width) * 0.5F, 16.0F});
+        preview->addChild(artwork);
+        AXLOGW("Unit preview fallback: unit={}, reason={}", entry->nameKey, previewError);
+    }
 
     auto* type = makePanel({190.0F, 38.0F}, elementColor(entry->element), 244);
     type->setPosition({12.0F, preview->getContentSize().height - 50.0F});
@@ -1562,12 +1578,10 @@ void LobbyLayer::showUnitDetail(int unitId, UnitDetailTab tab)
     typeText->setPosition(type->getContentSize() * 0.5F);
     type->addChild(typeText);
 
-    if (entry->modelId.empty())
-    {
-        auto* fallback = makeText("PHOTO PREVIEW  |  3D MODEL NOT MAPPED", 13.0F, Color32{225, 232, 239, 255});
-        fallback->setPosition({preview->getContentSize().width * 0.5F, 20.0F});
-        preview->addChild(fallback, 10);
-    }
+    auto* previewMode = makeText(unitPreview ? "LIVE 3D PREVIEW" : "PHOTO PREVIEW", 13.0F,
+                                 Color32{225, 232, 239, 255});
+    previewMode->setPosition({preview->getContentSize().width * 0.5F, 20.0F});
+    preview->addChild(previewMode, 10);
 
     constexpr std::array<std::string_view, 3> tabLabels = {"STATS", "EQUIPMENT", "SKILLS"};
     const float tabWidth = (modalSize.width - 48.0F) / static_cast<float>(tabLabels.size());

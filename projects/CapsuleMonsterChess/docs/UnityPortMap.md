@@ -38,8 +38,10 @@ cd /Users/ethanjung/Desktop/Dev/Cpp/axmol_my/projects/CapsuleMonsterChess
 python3 Tools/import_unity_content.py --unity-root "$UNITY_ROOT"
 ```
 
-결과는 `Content/Data/Tables/monster_unit_table.json`과 `Content/UI/MonsterIcons`에 생성된다.
-아이콘 PNG는 Unity 라이선스 파생 자산이므로 로컬 전용이며 Git 추적 대상이 아니다.
+결과는 `Content/Data/Tables/monster_unit_table.json`,
+`Content/Sprites/Units/<NameKey>/<NameKey>_1..3.png`,
+`Content/Models/Units/<NameKey>/<NameKey>.glb`에 생성된다. 구매한 원본 에셋에서 생성한
+런타임 PNG와 GLB는 CapsuleMonsterChess 프로젝트 자산으로 함께 추적한다.
 
 라이브 Sheet는 유효 유닛 168개다. 역할별로 Pawn 42, Knight/Bishop/Rook 각 28, Queen 24,
 King 18이며 스킬 1~3은 비어 있다. `Resources/MonsterUnitTable.asset`은 2026-07-04 스냅샷으로
@@ -47,10 +49,9 @@ King 18이며 스킬 1~3은 비어 있다. `Resources/MonsterUnitTable.asset`은
 현재 Export는 `Characters`만 기록해 version/hash/source가 없다.
 
 현재 임포터는 `.asset`을 복사하지 않고 168개 유닛을 `NameKey` 논리 키 기준으로
-가져온다. Unity `UnitThumbnails`의 파일명과 정규화한 `NameKey`가 유일하게 일치하는 39개
-아이콘만 직접 복사·리사이즈한다. 나머지 129개는 로비에서 속성색과 `NameKey`
-모노그램 placeholder로 표시한다. `NameKey`는 파일명이 아니므로 현재 정규화 일치는
-임시 규칙이며, 나머지 아이콘은 향후 `NameKey` → 자산 경로를 명시한 매핑으로 해결한다.
+가져온다. 이미지 판독으로 확정해 Unity `UnitThumbnails`의 파일명을 `NameKey_1..3`으로
+정리한 145종은 아이콘과 모델을 모두 연결한다. 원본 썸네일과 모델 자체가 없는 23종은
+빈 경로를 유지하며 로비에서 속성색과 `NameKey` 모노그램 placeholder로 표시한다.
 
 현재 로비용 JSON은 `schemaVersion`, 원본 URL/hash, 경고, 아이콘 바인딩 결과와
 `characters`를 기록한다. 서버 권위 전투 배포 전에 `tableVersion`, `sourceRevision`,
@@ -64,10 +65,11 @@ Unity 저장소와 연결된 Sheet 및 전체 Git 이력에는 스토리 스테�
 
 ## 모델 현황
 
-`MonsterModelDraft.csv`는 273행이고 전투 후보는 166개지만, 기록된 prefab 경로는 이전 폴더명을
-사용해 현재 실제 경로와 일치하는 항목이 없다. 모델 파일 자체는 273개 남아 있으므로 ID와 실제 FBX
-경로를 다시 매핑해야 한다. Dragon처럼 FBX를 self-contained GLB(meshopt + KTX2)로 변환하되,
-변환 manifest에 `unitId`, 원본 hash, 출력 hash를 기록해 테이블과 자산의 대응을 검증한다.
+확정된 썸네일의 `UnitXX/<제작자 캐릭터명>` 폴더를 같은 위치의 `Models` 폴더와 대응시켜
+145종을 self-contained GLB(meshopt + KTX2)로 변환했다. 프리뷰는 메시가 포함된 Idle FBX를
+우선하고, 애니메이션 전용 FBX처럼 렌더 메시가 없으면 같은 캐릭터의 base FBX로 폴백한다.
+현재 107종은 GLB 내 애니메이션을 재생하고 38종은 정적 모델로 표시된다. 모든 GLB는 메시와
+유효한 헤더를 검증했으며 테이블의 `modelId`와 `icon`이 실제 파일 경로를 가리킨다.
 
 ## 현재 공유 전투 코어
 

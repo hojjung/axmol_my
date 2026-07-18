@@ -39,20 +39,29 @@ Unity·Unreal 대응 관계를 포함한 수동 구현 기준은
 서버는 전체 Axmol target을 링크하지 않는다. `Server/CMakeLists.txt`의 allowlist에 있는 Scheduler,
 fixed-priority CustomEvent와 객체 수명 소스만 직접 컴파일한다.
 
-## 로컬 자산 변환
+## Unity 몬스터 자산 임포트
 
-Unity 원본과 변환 결과는 라이선스 자산이므로 Git에 커밋하지 않는다.
-`axasset`과 `gltfpack`은 엔진 루트의 로컬 도구이며 변환 결과만 프로젝트에서 사용한다.
+Unity 원본은 별도 제작 프로젝트에 보관하고, 게임에서 사용하는 구매 에셋의 변환 결과는
+CapsuleMonsterChess 프로젝트 자산으로 함께 추적한다.
+임포터는 라이브 몬스터 Sheet의 `NameKey`와 확정된 Unity 썸네일 이름을 기준으로
+썸네일 3장과 FBX 프리뷰 모델을 한 번에 배치한다. 모델은 `axasset`을 통해 meshopt 압축과
+KTX2 Basis 텍스처를 포함한 self-contained GLB로 변환한다.
 
 ```sh
-mkdir -p Content/Local
-
-../../build-axasset/tools/axasset/axasset \
-  --output Content/Local/DragonFireFlyIdle.glb \
-  '/Users/ethanjung/Desktop/Dev/Unity/CapsuleMonsterChess/CMS_Unity/Assets/Models/Unit02/DragonFire/FBX/Dragon Fire@Fly Idle.FBX'
+python3 Tools/import_unity_content.py \
+  --unity-root /Users/ethanjung/Desktop/Dev/Unity/CapsuleMonsterChess
 ```
 
-결과 런타임 포맷은 meshopt 압축과 KTX2 Basis 텍스처를 포함한 self-contained GLB다.
+결과 경로는 다음과 같다.
+
+- `Content/Sprites/Units/<NameKey>/<NameKey>_1.png`부터 `_3.png`
+- `Content/Models/Units/<NameKey>/<NameKey>.glb`
+- `Content/Data/Tables/monster_unit_table.json`
+
+현재 확정된 145종은 모두 연결됐고 `Content/Sprites/Units`와 `Content/Models/Units`를
+프로젝트에 포함한다. 원본 자산이 없는 23종은 테이블의 빈 경로와 UI placeholder를 유지한다.
+상세 유닛 창은 GLB가 있으면 3D 프리뷰를 재생하고 로드 실패 시 같은 `NameKey` 썸네일로
+안전하게 폴백한다.
 
 ## macOS OpenGL 빌드
 
